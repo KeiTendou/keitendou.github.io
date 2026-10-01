@@ -1,0 +1,22 @@
+[
+  {
+    "id": "fall",
+    "title": "추락, 이승, 발자국",
+    "edition": "1·2편 합본",
+    "originalTitle": "墜落、此岸、足跡",
+    "author": "大豆ビル",
+    "parts": [
+      "추락, 이승, 발자국",
+      "태양은 하늘에 계시고, 우리는 땅에 있다"
+    ],
+    "description": "大豆ビル의 회천 이후 후일담 한국어 번역본. 「추락, 이승, 발자국」과 후속편 「태양은 하늘에 계시고, 우리는 땅에 있다」의 제목과 본문 전체를 수록했다.",
+    "sources": [
+      { "label": "1편 원문", "url": "https://www.pixiv.net/novel/show.php?id=29115511" },
+      { "label": "2편 원문", "url": "https://www.pixiv.net/novel/show.php?id=29246664" }
+    ],
+    "file": "books/fall.epub",
+    "sha256": "290acbe497bcaf59e30c4c7a48dc81d6ab325810c5ba39ea7f01b6a290b0576d",
+    "accent": "#6d4c72",
+    "updated": "2026-10-01"
+  }
+]
