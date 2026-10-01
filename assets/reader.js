@@ -22,7 +22,7 @@ const bookId = params.get('book')
 const embedded = window.self !== window.top
 
 const THEMES = {
-  light: { bg: '#fbf8f3', fg: '#2b2622' },
+  light: { bg: '#ffffff', fg: '#1f1f1f' },
   sepia: { bg: '#f4ecd8', fg: '#4a3b2c' },
   dark: { bg: '#1d1b20', fg: '#e4ded8' },
 }

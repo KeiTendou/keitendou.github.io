@@ -1,13 +1,13 @@
 :root {
-  --paper: #fbf8f3;
-  --paper-2: #f3ede4;
-  --ink: #2b2622;
-  --ink-2: #6b625a;
-  --line: #e2d9cd;
+  --paper: #ffffff;
+  --paper-2: #f6f6f7;
+  --ink: #1f1f1f;
+  --ink-2: #6b6b6b;
+  --line: #e3e3e6;
   --accent: #6d4c72;
-  --accent-soft: #efe6f0;
-  --bar: rgba(251, 248, 243, 0.96);
-  --shadow: 0 1px 2px rgba(43, 38, 34, 0.08), 0 6px 18px rgba(43, 38, 34, 0.08);
+  --accent-soft: #f1eaf2;
+  --bar: rgba(255, 255, 255, 0.97);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 6px 18px rgba(0, 0, 0, 0.08);
   --serif: "Noto Serif KR", "KoPub Batang", "Nanum Myeongjo", "Batang", serif;
   --sans: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
   color-scheme: light;
@@ -86,8 +86,8 @@ button { font: inherit; color: inherit; }
   aspect-ratio: 2 / 3;
   padding: 10px 8px;
   border-radius: 4px 8px 8px 4px;
-  background: #fbf8f3;
-  color: #2b2622;
+  background: #ffffff;
+  color: #1f1f1f;
   text-align: center;
   text-decoration: none;
   box-shadow: var(--shadow), inset 4px 0 0 rgba(0, 0, 0, 0.06);
@@ -257,7 +257,7 @@ button { font: inherit; color: inherit; }
 .stepper { display: flex; align-items: center; gap: 8px; }
 .stepper button { width: 44px; height: 36px; border: 1px solid var(--line); border-radius: 8px; background: transparent; font-size: 1rem; cursor: pointer; }
 .stepper output { min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; font-size: 0.9rem; }
-.swatch-light { background: #fbf8f3 !important; color: #2b2622 !important; }
+.swatch-light { background: #ffffff !important; color: #1f1f1f !important; }
 .swatch-sepia { background: #f4ecd8 !important; color: #4a3b2c !important; }
 .swatch-dark { background: #1d1b20 !important; color: #e4ded8 !important; }
 
