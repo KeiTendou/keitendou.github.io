@@ -50,26 +50,35 @@ const FONTS = {
 //   휴대폰 기본 글꼴(sans-serif, system-ui), 마루 부리, 리디바탕은 비교에서 더 멀었다.
 // - 글자: 약 1.105배(15.2px에서 16.8px, 사용자 요청으로 18.4px, 17.4px, 16.4px, 16.6px를 거쳐 정함), 줄 사이는 38px 그대로(줄 간격 배수 x0.9049, 2.5에서 약 2.26)
 // - 밝은 테마 글자색: 완전한 검정(Play 북 글자 픽셀의 약 3분의 2가 #000)
-const PHONE = { scale: 1.1053, lineFactor: 0.9049, weight: 540, fg: '#000000' }
+const PHONE = { scale: 1.1053, lineFactor: 0.9049, weight: 540, fg: '#000000', minPitchRatio: 0.935 }
+// PC(넓은 화면에서 직접 연 경우): 2026-10-04 사용자 요청 "PC쪽도 글자를 키우자. 아래 위 여백을 줄여서 두줄 정도 더 놓고"
+// - 글자 약 1.079배(15.2px에서 16.4px), 굵기 450, 밝은 테마 글자색 #111(PC 모니터는 밀도가 낮아 가는 획이 흐려 보인다)
+// - 줄 사이 기본 38px(줄 간격 배수 x0.9268). 위아래 여백은 사용자가 열어 둔 Play 북 PC 화면(1920 창, 2026-10-04 캡처) 실측값:
+//   화면 위 끝에서 첫 줄 칸 위까지 66px, 마지막 줄 칸 아래에서 화면 아래 끝까지 77px(예전 사이트는 96px씩).
+//   휴대폰과 같이 줄 사이를 최대 6.5% 좁혀 한 줄을 더 넣는다.
+const DESK = { scale: 1.079, lineFactor: 0.9268, weight: 450, fg: '#111111', minPitchRatio: 0.935, top: 66, bottom: 77 }
+const TUNE = { phone: PHONE, desk: DESK }
 
 // 책 문서(iframe) 안에 넣는 CSS. 책 자체 CSS는 그대로 두고 필요한 것만 덮어쓴다.
 const bookCSS = settingsNow => {
-  const phone = layoutMode() === 'phone'
-  const s = phone ? { ...settingsNow, fontSize: +(settingsNow.fontSize * PHONE.scale).toFixed(1), lineHeight: +(settingsNow.lineHeight * PHONE.lineFactor).toFixed(3) } : settingsNow
+  const mode = layoutMode()
+  const tune = TUNE[mode]
+  const s = tune ? { ...settingsNow, fontSize: +(settingsNow.fontSize * tune.scale).toFixed(1), lineHeight: +(settingsNow.lineHeight * tune.lineFactor).toFixed(3) } : settingsNow
   const t = THEMES[s.theme] ?? THEMES.light
   const dark = s.theme === 'dark'
   const serif = s.font !== 'sans'
-  const weight = phone && serif ? PHONE.weight : null
-  const fg = phone && s.theme === 'light' ? PHONE.fg : t.fg
+  const weight = tune && serif ? tune.weight : null
+  const fg = tune && s.theme === 'light' ? tune.fg : t.fg
+  const fixedPitch = fitLine.mode === mode && fitLine.pitch > 0 ? fitLine.pitch : 0
   return `
 @import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@${weight && weight % 100 ? '400..700' : '400;500;600'}&display=swap");
 html { color-scheme: ${dark ? 'dark' : 'light'}; background: ${t.bg} !important; color: ${fg} !important; font-size: ${s.fontSize}% !important; }
 body { font-family: ${FONTS[s.font] ?? FONTS.serif} !important; color: inherit !important; text-align: ${s.align === 'justify' ? 'justify' : 'left'} !important; }
 ${weight ? `body { font-weight: ${weight} !important; }` : ''}
-${phone && phoneLine.pitch ? `body, p, .dialogue { line-height: ${phoneLine.pitch}px !important; }
-.gap { height: ${phoneLine.pitch}px !important; }
-.gap-2 { height: ${phoneLine.pitch * 2}px !important; }
-.gap-3 { height: ${phoneLine.pitch * 3}px !important; }` : `body, p, .dialogue { line-height: ${s.lineHeight} !important; }
+${fixedPitch ? `body, p, .dialogue { line-height: ${fixedPitch}px !important; }
+.gap { height: ${fixedPitch}px !important; }
+.gap-2 { height: ${fixedPitch * 2}px !important; }
+.gap-3 { height: ${fixedPitch * 3}px !important; }` : `body, p, .dialogue { line-height: ${s.lineHeight} !important; }
 .gap { height: ${s.lineHeight}em !important; }
 .gap-2 { height: ${s.lineHeight * 2}em !important; }
 .gap-3 { height: ${s.lineHeight * 3}em !important; }`}
@@ -139,40 +148,49 @@ const setAttr = (el, name, value) => {
 const linePitch = () => {
   const doc = view?.renderer?.getContents?.()?.[0]?.doc
   const lh = doc?.body ? parseFloat(doc.defaultView.getComputedStyle(doc.body).lineHeight) : NaN
-  const phone = layoutMode() === 'phone'
-  return lh > 0 ? lh : 16 * 0.95 * (settings.fontSize / 100) * settings.lineHeight * (phone ? PHONE.scale * PHONE.lineFactor : 1)
+  const tune = TUNE[layoutMode()]
+  return lh > 0 ? lh : 16 * 0.95 * (settings.fontSize / 100) * settings.lineHeight * (tune ? tune.scale * tune.lineFactor : 1)
 }
 // 휴대폰과 블로그 글 안: 글 영역 높이를 한 줄 높이의 배수로 맞추고 남는 공간을 위아래에 똑같이 나눈다.
 // (예전에는 남는 공간이 모두 아래로 가서 휴대폰에서 글이 위아래로 눌린 듯 보였다. 2026-10-04)
-// 휴대폰: 위아래 여백을 줄인 만큼 한 쪽에 줄을 더 넣는다(2026-10-04 사용자 요청 "한줄이라도 더 넣으려고").
-// - 위는 8px, 아래는 쪽 번호와 겹치지 않을 만큼(26px)만 비운다. 그래도 남는 공간은 아래(쪽 번호 쪽)로 간다.
+// 휴대폰과 PC: 위아래 여백을 줄인 만큼 한 쪽에 줄을 더 넣는다(2026-10-04 사용자 요청 "한줄이라도 더", "PC도 두줄 정도 더").
+// - 휴대폰은 위 8px, 아래는 쪽 번호와 겹치지 않을 만큼(26px)만 비운다.
+// - PC는 Play 북 PC 화면처럼 위 66px, 아래 77px를 비운다(막대가 더 높으면 막대 높이 + 4px).
 // - 기본 줄 사이(보통 38px)로 n줄이 들어가는 화면에서, 줄 사이를 최대 6.5% 좁혀 n+1줄이 들어가면 그렇게 한다.
-// - foliate의 margin은 위아래가 같으므로, 글 영역을 그대로 두고 리더 전체를 위로 올려 위를 줄이고 아래를 늘린다.
-const PHONE_EDGE = { top: 8, bottom: 26, minPitchRatio: 0.935 }
-let phoneLine = { pitch: 0, lines: 0 }
-const phoneBasePitch = () => {
+// - foliate의 margin은 위아래가 같으므로, 글 영역 높이에 맞춘 margin을 주고 리더 전체를 위아래로 옮겨 위 여백을 맞춘다.
+const PHONE_EDGE = { top: 8, bottom: 26 }
+let fitLine = { mode: null, pitch: 0, lines: 0, top: 0, bottom: 0 }
+const fitEdges = mode => {
+  if (mode === 'phone') return PHONE_EDGE
+  const top = Math.max(DESK.top, $('.bar-top').offsetHeight + 4)
+  const bottom = Math.max(DESK.bottom, $('.bar-bottom').offsetHeight + 4)
+  return { top, bottom }
+}
+const basePitch = mode => {
+  const tune = TUNE[mode]
   const doc = view?.renderer?.getContents?.()?.[0]?.doc
   const fontPx = doc?.body ? parseFloat(doc.defaultView.getComputedStyle(doc.body).fontSize) : NaN
-  const ratio = settings.lineHeight * PHONE.lineFactor
-  return (fontPx > 0 ? fontPx : 16 * 0.95 * (settings.fontSize / 100) * PHONE.scale) * ratio
+  return (fontPx > 0 ? fontPx : 16 * 0.95 * (settings.fontSize / 100) * tune.scale) * settings.lineHeight * tune.lineFactor
 }
-const phoneLayout = height => {
-  const base = phoneBasePitch()
-  const avail = height - PHONE_EDGE.top - PHONE_EDGE.bottom
+const fitLayout = (mode, height) => {
+  const tune = TUNE[mode]
+  const { top, bottom } = fitEdges(mode)
+  const base = basePitch(mode)
+  const avail = height - top - bottom
   let lines = Math.floor(avail / base + 0.01)
-  if (avail / (lines + 1) >= base * PHONE_EDGE.minPitchRatio) lines += 1
+  if (avail / (lines + 1) >= base * tune.minPitchRatio) lines += 1
   const pitch = Math.min(base, Math.floor((avail / lines) * 100) / 100)
-  return { pitch, lines }
+  return { mode, pitch, lines, top, bottom: height - top - lines * pitch }
 }
 const fitMargin = mode => {
   const base = parseFloat(LAYOUT[mode].margin)
-  if (mode === 'desk' || settings.flow !== 'paginated') return { margin: base, shift: 0 }
+  if (settings.flow !== 'paginated') return { margin: base, shift: 0 }
   const height = window.innerHeight
-  if (mode === 'phone') {
-    const { pitch, lines } = phoneLine
-    if (!(pitch > 0) || lines < 4) return { margin: base, shift: 0 }
+  if (TUNE[mode]) {
+    const { pitch, lines, top } = fitLine
+    if (fitLine.mode !== mode || !(pitch > 0) || lines < 4) return { margin: base, shift: 0 }
     const margin = Math.floor((height - lines * pitch) / 2)
-    return { margin, shift: Math.max(0, margin - PHONE_EDGE.top) }
+    return { margin, shift: margin - top }
   }
   const pitch = linePitch()
   // 줄 높이가 38.0007px처럼 소수점 아래로 조금 넘쳐도 한 줄을 잃지 않게 작은 여유를 둔다.
@@ -181,19 +199,23 @@ const fitMargin = mode => {
   return { margin: Math.floor((height - lines * pitch) / 2), shift: 0 }
 }
 const fitPage = () => {
-  if (layoutMode() === 'phone' && settings.flow === 'paginated') {
-    const next = phoneLayout(window.innerHeight)
-    if (next.lines !== phoneLine.lines || Math.abs(next.pitch - phoneLine.pitch) > 0.009) {
-      phoneLine = next
-      view.renderer.setStyles?.(bookCSS(settings))
+  const mode = layoutMode()
+  if (TUNE[mode] && settings.flow === 'paginated') {
+    const next = fitLayout(mode, window.innerHeight)
+    if (next.mode !== fitLine.mode || next.lines !== fitLine.lines || Math.abs(next.pitch - fitLine.pitch) > 0.009 || next.top !== fitLine.top) {
+      const restyle = next.mode !== fitLine.mode || next.lines !== fitLine.lines || Math.abs(next.pitch - fitLine.pitch) > 0.009
+      fitLine = next
+      if (restyle) view.renderer.setStyles?.(bookCSS(settings))
     }
-  } else if (phoneLine.pitch) {
-    phoneLine = { pitch: 0, lines: 0 }
+  } else if (fitLine.pitch) {
+    fitLine = { mode: null, pitch: 0, lines: 0, top: 0, bottom: 0 }
     view.renderer.setStyles?.(bookCSS(settings))
   }
-  const { margin, shift } = fitMargin(layoutMode())
+  const { margin, shift } = fitMargin(mode)
   setAttr(view.renderer, 'margin', `${margin}px`)
   document.documentElement.style.setProperty('--page-margin', `${margin}px`)
+  document.documentElement.style.setProperty('--page-top', `${fitLine.mode === mode ? fitLine.top : margin}px`)
+  document.documentElement.style.setProperty('--page-bottom', `${fitLine.mode === mode ? Math.round(fitLine.bottom) : margin}px`)
   const viewer = $('#viewer')
   viewer.style.top = shift ? `${-shift}px` : ''
   viewer.style.bottom = shift ? `${shift}px` : ''
@@ -203,8 +225,10 @@ const fitPage = () => {
 // 삽화(figure.illustration). 2026-10-04 사용자 지정 배치: EPUB에 정한 행(116행) 뒤에서 쪽을 끝내고,
 // 다음 쪽 둘째 줄 자리부터 그림, 그림 아래 한 줄을 띄운 뒤 같은 쪽에서 다음 문장이 이어진다.
 // 아래 글줄이 쪽의 줄 칸에 맞도록 그림 높이를 줄 높이의 정수배로 맞추고(비율 유지), 위아래에 한 줄씩 비운다.
-// 그림 아래에는 적어도 두 줄이 들어가게 그림 높이를 제한한다.
+// 그림 아래 글 자리: 휴대폰과 블로그 글 안은 적어도 두 줄. PC는 「실례했습니다」와 다음 문단이 함께 들어가도록 다섯 줄
+// (PC에서 그림이 쪽 높이만큼 커지면 다음 문단이 다음 쪽으로 밀렸다. 2026-10-04. 휴대폰은 사용자가 마음에 들어 해 그대로 둠).
 // (이전의 화면별 자리 옮김, 문단 나눔 방식은 사용자 요청으로 뺐다.)
+const ILLUSTRATION_TEXT_BELOW = { desk: 5, phone: 2, embed: 2 }
 const sizeIllustrations = doc => {
   const figures = [...doc.querySelectorAll('figure.illustration')]
   if (!figures.length || settings.flow !== 'paginated') return false
@@ -220,7 +244,7 @@ const sizeIllustrations = doc => {
     if (!img) continue
     if (!img.complete) img.addEventListener('load', scheduleIllustrations, { once: true })
     const ratio = img.naturalWidth ? img.naturalHeight / img.naturalWidth : 2802 / 2000
-    const room = columnHeight - line * 4
+    const room = columnHeight - line * (2 + ILLUSTRATION_TEXT_BELOW[layoutMode()])
     // foliate가 그림에 거는 최대 높이(화면 높이 - 위아래 여백, !important)도 넘지 않게 한다.
     const cap = parseFloat(win.getComputedStyle(img).maxHeight)
     const limit = Math.min(columnWidth * ratio, room, cap > 0 ? cap : Infinity)

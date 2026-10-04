@@ -201,8 +201,8 @@ button { font: inherit; color: inherit; }
   position: fixed;
   z-index: 2;
   left: 50%;
-  top: calc(var(--page-margin, 48px) - 8px);
-  bottom: calc(var(--page-margin, 48px) - 8px);
+  top: calc(var(--page-top, 48px) - 8px);
+  bottom: calc(var(--page-bottom, 48px) - 8px);
   width: 28px;
   margin-left: -14px;
   pointer-events: none;
