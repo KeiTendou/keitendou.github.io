@@ -226,6 +226,8 @@ button { font: inherit; color: inherit; }
   opacity: 0.85;
 }
 .reader-page:not(.chrome-hidden) .peek { opacity: 0; }
+/* 휴대폰: 줄을 한 줄 더 넣으면서 아래 여백이 줄어, 쪽 번호를 화면 아래쪽으로 조금 내린다(2026-10-04) */
+.reader-page[data-layout="phone"] .peek { padding-bottom: max(6px, env(safe-area-inset-bottom)); }
 
 .sheet-backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, 0.28); }
 .sheet {

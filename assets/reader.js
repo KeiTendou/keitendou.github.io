@@ -66,11 +66,15 @@ const bookCSS = settingsNow => {
 html { color-scheme: ${dark ? 'dark' : 'light'}; background: ${t.bg} !important; color: ${fg} !important; font-size: ${s.fontSize}% !important; }
 body { font-family: ${FONTS[s.font] ?? FONTS.serif} !important; color: inherit !important; text-align: ${s.align === 'justify' ? 'justify' : 'left'} !important; }
 ${weight ? `body { font-weight: ${weight} !important; }` : ''}
-body, p, .dialogue { line-height: ${s.lineHeight} !important; }
+${phone && phoneLine.pitch ? `body, p, .dialogue { line-height: ${phoneLine.pitch}px !important; }
+.gap { height: ${phoneLine.pitch}px !important; }
+.gap-2 { height: ${phoneLine.pitch * 2}px !important; }
+.gap-3 { height: ${phoneLine.pitch * 3}px !important; }` : `body, p, .dialogue { line-height: ${s.lineHeight} !important; }
 .gap { height: ${s.lineHeight}em !important; }
 .gap-2 { height: ${s.lineHeight * 2}em !important; }
-.gap-3 { height: ${s.lineHeight * 3}em !important; }
+.gap-3 { height: ${s.lineHeight * 3}em !important; }`}
 p { widows: ${layoutMode() === 'desk' ? 2 : 1}; orphans: ${layoutMode() === 'desk' ? 2 : 1}; }
+.illustration-cont { text-indent: 0 !important; }
 .illustration { box-sizing: border-box; height: calc(100vh - 2px); display: flex; flex-direction: column; justify-content: center; align-items: center; }
 .illustration img { max-width: 100%; max-height: calc(100vh - 2px); width: auto; height: auto; }
 ${embedded ? 'html { touch-action: pan-y pinch-zoom; }' : ''}
@@ -142,23 +146,53 @@ const linePitch = () => {
 }
 // 휴대폰과 블로그 글 안: 글 영역 높이를 한 줄 높이의 배수로 맞추고 남는 공간을 위아래에 똑같이 나눈다.
 // (예전에는 남는 공간이 모두 아래로 가서 휴대폰에서 글이 위아래로 눌린 듯 보였다. 2026-10-04)
-// 휴대폰: 위쪽에는 아무것도 없으니 좁게, 아래쪽은 쪽 번호 자리로 넉넉하게(2026-10-04 사용자 지적).
-// foliate의 margin은 위아래가 같으므로, 글 영역을 그대로 두고 리더 전체를 위로 shift만큼 올려 위를 줄이고 아래를 늘린다.
-const PHONE_EDGE = { top: 16, bottom: 30 }
+// 휴대폰: 위아래 여백을 줄인 만큼 한 쪽에 줄을 더 넣는다(2026-10-04 사용자 요청 "한줄이라도 더 넣으려고").
+// - 위는 8px, 아래는 쪽 번호와 겹치지 않을 만큼(26px)만 비운다. 그래도 남는 공간은 아래(쪽 번호 쪽)로 간다.
+// - 기본 줄 사이(보통 38px)로 n줄이 들어가는 화면에서, 줄 사이를 최대 6.5% 좁혀 n+1줄이 들어가면 그렇게 한다.
+// - foliate의 margin은 위아래가 같으므로, 글 영역을 그대로 두고 리더 전체를 위로 올려 위를 줄이고 아래를 늘린다.
+const PHONE_EDGE = { top: 8, bottom: 26, minPitchRatio: 0.935 }
+let phoneLine = { pitch: 0, lines: 0 }
+const phoneBasePitch = () => {
+  const doc = view?.renderer?.getContents?.()?.[0]?.doc
+  const fontPx = doc?.body ? parseFloat(doc.defaultView.getComputedStyle(doc.body).fontSize) : NaN
+  const ratio = settings.lineHeight * PHONE.lineFactor
+  return (fontPx > 0 ? fontPx : 16 * 0.95 * (settings.fontSize / 100) * PHONE.scale) * ratio
+}
+const phoneLayout = height => {
+  const base = phoneBasePitch()
+  const avail = height - PHONE_EDGE.top - PHONE_EDGE.bottom
+  let lines = Math.floor(avail / base + 0.01)
+  if (avail / (lines + 1) >= base * PHONE_EDGE.minPitchRatio) lines += 1
+  const pitch = Math.min(base, Math.floor((avail / lines) * 100) / 100)
+  return { pitch, lines }
+}
 const fitMargin = mode => {
   const base = parseFloat(LAYOUT[mode].margin)
   if (mode === 'desk' || settings.flow !== 'paginated') return { margin: base, shift: 0 }
-  const pitch = linePitch()
   const height = window.innerHeight
-  const top = mode === 'phone' ? PHONE_EDGE.top : base
-  const bottom = mode === 'phone' ? PHONE_EDGE.bottom : base
+  if (mode === 'phone') {
+    const { pitch, lines } = phoneLine
+    if (!(pitch > 0) || lines < 4) return { margin: base, shift: 0 }
+    const margin = Math.floor((height - lines * pitch) / 2)
+    return { margin, shift: Math.max(0, margin - PHONE_EDGE.top) }
+  }
+  const pitch = linePitch()
   // 줄 높이가 38.0007px처럼 소수점 아래로 조금 넘쳐도 한 줄을 잃지 않게 작은 여유를 둔다.
-  const lines = Math.floor((height - top - bottom) / pitch + 0.01)
+  const lines = Math.floor((height - 2 * base) / pitch + 0.01)
   if (!(pitch > 0) || lines < 4) return { margin: base, shift: 0 }
-  const margin = Math.floor((height - lines * pitch) / 2)
-  return { margin, shift: mode === 'phone' ? Math.max(0, margin - top) : 0 }
+  return { margin: Math.floor((height - lines * pitch) / 2), shift: 0 }
 }
 const fitPage = () => {
+  if (layoutMode() === 'phone' && settings.flow === 'paginated') {
+    const next = phoneLayout(window.innerHeight)
+    if (next.lines !== phoneLine.lines || Math.abs(next.pitch - phoneLine.pitch) > 0.009) {
+      phoneLine = next
+      view.renderer.setStyles?.(bookCSS(settings))
+    }
+  } else if (phoneLine.pitch) {
+    phoneLine = { pitch: 0, lines: 0 }
+    view.renderer.setStyles?.(bookCSS(settings))
+  }
   const { margin, shift } = fitMargin(layoutMode())
   setAttr(view.renderer, 'margin', `${margin}px`)
   document.documentElement.style.setProperty('--page-margin', `${margin}px`)
@@ -168,11 +202,22 @@ const fitPage = () => {
   scheduleIllustrations()
 }
 
-// 한 쪽 전체를 쓰는 삽화(figure.illustration, 앞뒤에서 쪽을 나눔, 쪽 가운데에 놓음).
-// EPUB에는 정해진 행 뒤에 들어 있지만, 그 자리에서 쪽을 강제로 나누면 화면에 따라 앞쪽이 덜 찬 채 끝난다.
-// 그래서 정해진 행 근처(앞 2문단~뒤 3문단) 중 그 화면에서 쪽이 가장 꽉 차게 끝나는 문단 뒤로 그림을 옮긴다.
-// 남는 빈칸이 비슷하면 정해진 행에 가까운 쪽을 고른다(문단 하나 멀어질 때마다 줄 높이의 0.35배를 더함). 2026-10-04
-const ILLUSTRATION_RANGE = { before: 2, after: 3, distanceWeight: 0.35 }
+// 한 쪽 전체를 쓰는 삽화(figure.illustration, 앞뒤에서 쪽을 나눔, 쪽 가운데에 놓음). 2026-10-04
+// EPUB에는 정해진 행 뒤에 들어 있지만, 그 자리에서 쪽을 강제로 나누면 화면에 따라 앞쪽이 덜 찬 채 끝난다. 그래서 화면마다
+// 1) 정해진 행의 앞 2문단~뒤 7문단 중 문단 끝이 쪽 끝과 거의 맞는(빈칸이 한 줄 미만) 자리가 있으면 그 문단 뒤로 옮긴다.
+//    여러 곳이면 빈칸과 거리(문단 하나에 줄 높이의 0.3배)를 더한 값이 작은 곳.
+// 2) 없으면(긴 문단이 쪽 경계에 걸린 경우) 종이책 전면 삽화처럼, 쪽이 끝나는 줄에서 문단을 둘로 나누고 그 사이에 넣는다.
+//    정해진 행에 가장 가까운 경계를 쓰고, 낱말 가운데서는 나누지 않는다. 나눈 뒤쪽은 들여쓰기 없이 이어지고, 다시 계산할 때는 먼저 원래 한 문단으로 합친다.
+//    (처음에는 1번만 했으나, 휴대폰 줄 수를 늘린 뒤 갤럭시 크기 등에서 2~4줄이 비어 2번을 더했다.)
+const ILLUSTRATION_RANGE = { before: 2, after: 7, distanceWeight: 0.3, cleanBlankLines: 1 }
+const SPLIT_CLASS = 'illustration-cont'
+const unsplitIllustrations = doc => {
+  for (const cont of doc.querySelectorAll(`p.${SPLIT_CLASS}`)) {
+    const head = doc.getElementById(cont.dataset.splitOf)
+    if (head) { head.append(...cont.childNodes); head.normalize() }
+    cont.remove()
+  }
+}
 const placeIllustrations = doc => {
   const figures = [...doc.querySelectorAll('figure.illustration')]
   if (!figures.length || settings.flow !== 'paginated') return false
@@ -188,26 +233,60 @@ const placeIllustrations = doc => {
     if (!figure.dataset.anchor) figure.dataset.anchor = figure.previousElementSibling?.id ?? ''
     const anchor = doc.getElementById(figure.dataset.anchor)
     if (!anchor) continue
+    const before = figure.dataset.sig ?? ''
+    unsplitIllustrations(doc)
     const paragraphs = [...anchor.parentElement.children].filter(e => e.matches('p[id]'))
     const at = paragraphs.indexOf(anchor)
     // 그림을 잠시 빼고 글이 원래 어떻게 쪽에 놓이는지 잰다.
     figure.style.display = 'none'
     const box = html.getBoundingClientRect()
-    let best = null
+    const padLeft = parseFloat(st.paddingLeft) || 0
+    const columnOf = x => Math.floor((x - box.left - padLeft + 1) / pitch)
+    const info = []
     for (let i = Math.max(0, at - ILLUSTRATION_RANGE.before); i <= Math.min(paragraphs.length - 1, at + ILLUSTRATION_RANGE.after); i++) {
       const range = doc.createRange()
       range.selectNodeContents(paragraphs[i])
       const lines = [...range.getClientRects()].filter(r => r.width > 0)
-      const last = lines[lines.length - 1]
-      if (!last) continue
-      const blank = Math.max(0, columnHeight - (last.bottom - box.top))
-      const cost = blank + Math.abs(i - at) * lineHeight * ILLUSTRATION_RANGE.distanceWeight
-      if (!best || cost < best.cost) best = { i, cost, blank }
+      if (!lines.length) continue
+      const first = lines[0], last = lines[lines.length - 1]
+      info.push({ i, blank: Math.max(0, columnHeight - (last.bottom - box.top)), startCol: columnOf(first.left), endCol: columnOf(last.left) })
+    }
+    let target = anchor, splitAt = -1
+    const clean = info.filter(c => c.blank < lineHeight * ILLUSTRATION_RANGE.cleanBlankLines)
+      .map(c => ({ ...c, cost: c.blank + Math.abs(c.i - at) * lineHeight * ILLUSTRATION_RANGE.distanceWeight }))
+      .sort((a, b) => a.cost - b.cost)[0]
+    if (clean) target = paragraphs[clean.i]
+    else {
+      const straddle = info.filter(c => c.endCol > c.startCol).sort((a, b) => Math.abs(a.i - at) - Math.abs(b.i - at))[0]
+      const text = straddle && paragraphs[straddle.i].firstChild
+      if (straddle && text?.nodeType === 3 && paragraphs[straddle.i].childNodes.length === 1) {
+        // 다음 쪽(단)에 놓이는 첫 글자를 찾는다(글자 순서대로 단 번호가 커지므로 이분 탐색).
+        const charCol = k => { const r = doc.createRange(); r.setStart(text, k); r.setEnd(text, k + 1); return columnOf(r.getBoundingClientRect().left) }
+        let lo = 0, hi = text.length - 1
+        while (lo < hi) { const mid = (lo + hi) >> 1; if (charCol(mid) > straddle.startCol) hi = mid; else lo = mid + 1 }
+        // 낱말이 쪼개지지 않게, 다음 쪽 첫 글자가 낱말 중간이면 그 낱말의 처음(앞 띄어쓰기 바로 뒤)으로 물러난다.
+        let k = lo
+        while (k > 0 && !/\s/.test(text.data[k - 1])) k--
+        if (k === 0) k = lo
+        if (lo > 0 && charCol(lo) > straddle.startCol) { target = paragraphs[straddle.i]; splitAt = k }
+      }
+      if (splitAt < 0 && info.length) {
+        const any = info.map(c => ({ ...c, cost: c.blank + Math.abs(c.i - at) * lineHeight * ILLUSTRATION_RANGE.distanceWeight })).sort((a, b) => a.cost - b.cost)[0]
+        target = paragraphs[any.i]
+      }
     }
     figure.style.display = ''
-    const target = best ? paragraphs[best.i] : anchor
-    if (target.nextElementSibling !== figure) { target.after(figure); moved = true }
-    figure.dataset.placedAfter = target.id
+    if (splitAt > 0) {
+      const cont = doc.createElement('p')
+      cont.className = [SPLIT_CLASS, ...target.classList].join(' ')
+      cont.dataset.splitOf = target.id
+      cont.append(target.firstChild.splitText(splitAt))
+      target.after(cont)
+    }
+    target.after(figure)
+    figure.dataset.placedAfter = target.id + (splitAt > 0 ? `@${splitAt}` : '')
+    figure.dataset.sig = figure.dataset.placedAfter
+    if (figure.dataset.sig !== before) moved = true
   }
   return moved
 }
