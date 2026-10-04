@@ -58,7 +58,7 @@ body, p, .dialogue { line-height: ${s.lineHeight} !important; }
 .gap { height: ${s.lineHeight}em !important; }
 .gap-2 { height: ${s.lineHeight * 2}em !important; }
 .gap-3 { height: ${s.lineHeight * 3}em !important; }
-p { widows: 2; orphans: 2; }
+p { widows: ${layoutMode() === 'desk' ? 2 : 1}; orphans: ${layoutMode() === 'desk' ? 2 : 1}; }
 ${embedded ? 'html { touch-action: pan-y pinch-zoom; }' : ''}
 ${dark ? `
 .cover h1, .author, .toc a, a { color: #d9b8df !important; }
@@ -106,18 +106,42 @@ const openSheet = id => {
 const applyStyles = () => {
   document.documentElement.dataset.theme = settings.theme
   view?.renderer.setStyles?.(bookCSS(settings))
+  if (view) fitPage()
 }
 // 쪽 여백. Play 북 PC 화면은 한 쪽 글 너비 약 600px, 두 쪽 사이 약 100px, 위아래 막대 아래 넉넉한 여백이었다.
 // foliate의 좌우 여백은 화면 폭 x gap(바깥 여백과 단 안쪽 여백의 합)이다. 휴대폰은 7%로 390px 폭에서 약 27px씩.
 const LAYOUT = {
   desk: { margin: '96px', gap: '7%' },
   embed: { margin: '40px', gap: '9%' },
-  phone: { margin: '44px', gap: '7%' },
+  phone: { margin: '28px', gap: '7%' },
 }
 const setAttr = (el, name, value) => {
   if (value === null) { if (el.hasAttribute(name)) el.removeAttribute(name) }
   else if (el.getAttribute(name) !== value) el.setAttribute(name, value)
 }
+// 한 줄 높이(px). 책 문서가 열려 있으면 실제 계산값, 아니면 설정에서 계산한다.
+const linePitch = () => {
+  const doc = view?.renderer?.getContents?.()?.[0]?.doc
+  const lh = doc?.body ? parseFloat(doc.defaultView.getComputedStyle(doc.body).lineHeight) : NaN
+  return lh > 0 ? lh : 16 * 0.95 * (settings.fontSize / 100) * settings.lineHeight
+}
+// 휴대폰과 블로그 글 안: 글 영역 높이를 한 줄 높이의 배수로 맞추고 남는 공간을 위아래에 똑같이 나눈다.
+// (예전에는 남는 공간이 모두 아래로 가서 휴대폰에서 글이 위아래로 눌린 듯 보였다. 2026-10-04)
+const fitMargin = mode => {
+  const base = parseFloat(LAYOUT[mode].margin)
+  if (mode === 'desk' || settings.flow !== 'paginated') return base
+  const pitch = linePitch()
+  const height = $('#viewer').clientHeight || window.innerHeight
+  const lines = Math.floor((height - 2 * base) / pitch)
+  if (!(pitch > 0) || lines < 4) return base
+  return Math.floor((height - lines * pitch) / 2)
+}
+const fitPage = () => {
+  const margin = `${fitMargin(layoutMode())}px`
+  setAttr(view.renderer, 'margin', margin)
+  document.documentElement.style.setProperty('--page-margin', margin)
+}
+let lastMode = null
 const applyLayout = () => {
   if (!view) return
   const mode = layoutMode()
@@ -129,10 +153,11 @@ const applyLayout = () => {
   setAttr(r, 'flow', settings.flow)
   setAttr(r, 'max-column-count', settings.spread === 'single' ? '1' : '2')
   setAttr(r, 'max-inline-size', '700px')
-  setAttr(r, 'margin', LAYOUT[mode].margin)
   setAttr(r, 'gap', LAYOUT[mode].gap)
   setAttr(r, 'animated', settings.flow === 'paginated' ? '' : null)
-  document.documentElement.style.setProperty('--page-margin', LAYOUT[mode].margin)
+  // 화면 종류가 바뀌면 문단 나눔 규칙도 바뀌므로 책 CSS를 다시 넣는다(그 안에서 여백도 맞춤).
+  if (mode !== lastMode) { lastMode = mode; applyStyles() }
+  else fitPage()
   requestAnimationFrame(updateSpine)
 }
 
@@ -236,6 +261,7 @@ const guardTouches = target => {
 
 const onLoadSection = e => {
   const { doc } = e.detail
+  requestAnimationFrame(fitPage)
   guardTouches(doc)
   doc.addEventListener('keydown', onKey)
   doc.addEventListener('click', ev => {
