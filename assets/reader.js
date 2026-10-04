@@ -142,20 +142,29 @@ const linePitch = () => {
 }
 // 휴대폰과 블로그 글 안: 글 영역 높이를 한 줄 높이의 배수로 맞추고 남는 공간을 위아래에 똑같이 나눈다.
 // (예전에는 남는 공간이 모두 아래로 가서 휴대폰에서 글이 위아래로 눌린 듯 보였다. 2026-10-04)
+// 휴대폰: 위쪽에는 아무것도 없으니 좁게, 아래쪽은 쪽 번호 자리로 넉넉하게(2026-10-04 사용자 지적).
+// foliate의 margin은 위아래가 같으므로, 글 영역을 그대로 두고 리더 전체를 위로 shift만큼 올려 위를 줄이고 아래를 늘린다.
+const PHONE_EDGE = { top: 16, bottom: 30 }
 const fitMargin = mode => {
   const base = parseFloat(LAYOUT[mode].margin)
-  if (mode === 'desk' || settings.flow !== 'paginated') return base
+  if (mode === 'desk' || settings.flow !== 'paginated') return { margin: base, shift: 0 }
   const pitch = linePitch()
-  const height = $('#viewer').clientHeight || window.innerHeight
+  const height = window.innerHeight
+  const top = mode === 'phone' ? PHONE_EDGE.top : base
+  const bottom = mode === 'phone' ? PHONE_EDGE.bottom : base
   // 줄 높이가 38.0007px처럼 소수점 아래로 조금 넘쳐도 한 줄을 잃지 않게 작은 여유를 둔다.
-  const lines = Math.floor((height - 2 * base) / pitch + 0.01)
-  if (!(pitch > 0) || lines < 4) return base
-  return Math.floor((height - lines * pitch) / 2)
+  const lines = Math.floor((height - top - bottom) / pitch + 0.01)
+  if (!(pitch > 0) || lines < 4) return { margin: base, shift: 0 }
+  const margin = Math.floor((height - lines * pitch) / 2)
+  return { margin, shift: mode === 'phone' ? Math.max(0, margin - top) : 0 }
 }
 const fitPage = () => {
-  const margin = `${fitMargin(layoutMode())}px`
-  setAttr(view.renderer, 'margin', margin)
-  document.documentElement.style.setProperty('--page-margin', margin)
+  const { margin, shift } = fitMargin(layoutMode())
+  setAttr(view.renderer, 'margin', `${margin}px`)
+  document.documentElement.style.setProperty('--page-margin', `${margin}px`)
+  const viewer = $('#viewer')
+  viewer.style.top = shift ? `${-shift}px` : ''
+  viewer.style.bottom = shift ? `${shift}px` : ''
   scheduleIllustrations()
 }
 
