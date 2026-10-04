@@ -35,6 +35,8 @@ const bookId = params.get('book') || document.body.dataset.book
 // ?part=2처럼 열면 그 편(목차 항목)부터 시작한다.
 const startPart = Number.parseInt(params.get('part') ?? '', 10)
 const embedded = window.self !== window.top
+// 2026-10-04 휴대폰 비교용 임시 화면(저장하지 않음). b: 진하게, c: 휴대폰 글자 크게, d: 둘 다
+const LOOK = ['b', 'c', 'd'].includes(params.get('look')) ? params.get('look') : null
 
 const THEMES = {
   light: { bg: '#ffffff', fg: '#1f1f1f' },
@@ -47,12 +49,17 @@ const FONTS = {
 }
 
 // 책 문서(iframe) 안에 넣는 CSS. 책 자체 CSS는 그대로 두고 필요한 것만 덮어쓴다.
-const bookCSS = s => {
+const bookCSS = settingsNow => {
+  const bold = LOOK === 'b' || LOOK === 'd'
+  const big = (LOOK === 'c' || LOOK === 'd') && layoutMode() !== 'desk'
+  // 크게: 글자 1.1배, 줄 사이(px)는 거의 그대로(2.5 x 0.92 x 1.1 = 약 2.53배 높이)
+  const s = big ? { ...settingsNow, fontSize: settingsNow.fontSize * 1.1, lineHeight: +(settingsNow.lineHeight * 0.92).toFixed(3) } : settingsNow
   const t = THEMES[s.theme] ?? THEMES.light
   const dark = s.theme === 'dark'
   return `
-@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600&display=swap");
-html { color-scheme: ${dark ? 'dark' : 'light'}; background: ${t.bg} !important; color: ${t.fg} !important; font-size: ${s.fontSize}% !important; }
+@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;${bold ? '500;' : ''}600&display=swap");
+html { color-scheme: ${dark ? 'dark' : 'light'}; background: ${t.bg} !important; color: ${bold && s.theme === 'light' ? '#0d0d0d' : t.fg} !important; font-size: ${s.fontSize}% !important; }
+${bold ? 'body { font-weight: 500 !important; }' : ''}
 body { font-family: ${FONTS[s.font] ?? FONTS.serif} !important; color: inherit !important; text-align: ${s.align === 'justify' ? 'justify' : 'left'} !important; }
 body, p, .dialogue { line-height: ${s.lineHeight} !important; }
 .gap { height: ${s.lineHeight}em !important; }
@@ -123,7 +130,7 @@ const setAttr = (el, name, value) => {
 const linePitch = () => {
   const doc = view?.renderer?.getContents?.()?.[0]?.doc
   const lh = doc?.body ? parseFloat(doc.defaultView.getComputedStyle(doc.body).lineHeight) : NaN
-  return lh > 0 ? lh : 16 * 0.95 * (settings.fontSize / 100) * settings.lineHeight
+  return lh > 0 ? lh : 16 * 0.95 * (settings.fontSize / 100) * settings.lineHeight * (LOOK === 'c' || LOOK === 'd' ? 1.012 : 1)
 }
 // 휴대폰과 블로그 글 안: 글 영역 높이를 한 줄 높이의 배수로 맞추고 남는 공간을 위아래에 똑같이 나눈다.
 // (예전에는 남는 공간이 모두 아래로 가서 휴대폰에서 글이 위아래로 눌린 듯 보였다. 2026-10-04)
@@ -200,7 +207,7 @@ const onRelocate = e => {
   $('#slider').value = String(fraction ?? 0)
   $('#loc-title').textContent = part > 0 ? `${part}편 「${tocItem.label.trim()}」` : book.title
   $('#loc-page').textContent = info ? pageText(info) : percent(fraction)
-  $('#peek').textContent = info ? `${info.first} / ${info.total}` : ''
+  $('#peek').textContent = (info ? `${info.first} / ${info.total}` : '') + (LOOK ? `   ${LOOK.toUpperCase()}안` : '')
   updateSpine()
   for (const b of document.querySelectorAll('#toc-list button'))
     b.setAttribute('aria-current', String(!!tocItem && b.dataset.href === tocItem.href))
