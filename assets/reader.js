@@ -74,9 +74,7 @@ ${phone && phoneLine.pitch ? `body, p, .dialogue { line-height: ${phoneLine.pitc
 .gap-2 { height: ${s.lineHeight * 2}em !important; }
 .gap-3 { height: ${s.lineHeight * 3}em !important; }`}
 p { widows: ${layoutMode() === 'desk' ? 2 : 1}; orphans: ${layoutMode() === 'desk' ? 2 : 1}; }
-.illustration-cont { text-indent: 0 !important; }
-.illustration { box-sizing: border-box; height: calc(100vh - 2px); display: flex; flex-direction: column; justify-content: center; align-items: center; }
-.illustration img { max-width: 100%; max-height: calc(100vh - 2px); width: auto; height: auto; }
+.illustration { break-after: auto !important; page-break-after: auto !important; }
 ${embedded ? 'html { touch-action: pan-y pinch-zoom; }' : ''}
 ${dark ? `
 .cover h1, .author, .toc a, a { color: #d9b8df !important; }
@@ -202,100 +200,48 @@ const fitPage = () => {
   scheduleIllustrations()
 }
 
-// 한 쪽 전체를 쓰는 삽화(figure.illustration, 앞뒤에서 쪽을 나눔, 쪽 가운데에 놓음). 2026-10-04
-// EPUB에는 정해진 행 뒤에 들어 있지만, 그 자리에서 쪽을 강제로 나누면 화면에 따라 앞쪽이 덜 찬 채 끝난다. 그래서 화면마다
-// 1) 정해진 행의 앞 2문단~뒤 7문단 중 문단 끝이 쪽 끝과 거의 맞는(빈칸이 한 줄 미만) 자리가 있으면 그 문단 뒤로 옮긴다.
-//    여러 곳이면 빈칸과 거리(문단 하나에 줄 높이의 0.3배)를 더한 값이 작은 곳.
-// 2) 없으면(긴 문단이 쪽 경계에 걸린 경우) 종이책 전면 삽화처럼, 쪽이 끝나는 줄에서 문단을 둘로 나누고 그 사이에 넣는다.
-//    정해진 행에 가장 가까운 경계를 쓰고, 낱말 가운데서는 나누지 않는다. 나눈 뒤쪽은 들여쓰기 없이 이어지고, 다시 계산할 때는 먼저 원래 한 문단으로 합친다.
-//    (처음에는 1번만 했으나, 휴대폰 줄 수를 늘린 뒤 갤럭시 크기 등에서 2~4줄이 비어 2번을 더했다.)
-const ILLUSTRATION_RANGE = { before: 2, after: 7, distanceWeight: 0.3, cleanBlankLines: 1 }
-const SPLIT_CLASS = 'illustration-cont'
-const unsplitIllustrations = doc => {
-  for (const cont of doc.querySelectorAll(`p.${SPLIT_CLASS}`)) {
-    const head = doc.getElementById(cont.dataset.splitOf)
-    if (head) { head.append(...cont.childNodes); head.normalize() }
-    cont.remove()
-  }
-}
-const placeIllustrations = doc => {
+// 삽화(figure.illustration). 2026-10-04 사용자 지정 배치: EPUB에 정한 행(116행) 뒤에서 쪽을 끝내고,
+// 다음 쪽 둘째 줄 자리부터 그림, 그림 아래 한 줄을 띄운 뒤 같은 쪽에서 다음 문장이 이어진다.
+// 아래 글줄이 쪽의 줄 칸에 맞도록 그림 높이를 줄 높이의 정수배로 맞추고(비율 유지), 위아래에 한 줄씩 비운다.
+// 그림 아래에는 적어도 두 줄이 들어가게 그림 높이를 제한한다.
+// (이전의 화면별 자리 옮김, 문단 나눔 방식은 사용자 요청으로 뺐다.)
+const sizeIllustrations = doc => {
   const figures = [...doc.querySelectorAll('figure.illustration')]
   if (!figures.length || settings.flow !== 'paginated') return false
   const html = doc.documentElement
   const win = doc.defaultView
-  const st = win.getComputedStyle(html)
-  const pitch = parseFloat(st.columnWidth) + parseFloat(st.columnGap)
+  const columnWidth = parseFloat(win.getComputedStyle(html).columnWidth)
   const columnHeight = html.clientHeight
-  const lineHeight = parseFloat(win.getComputedStyle(doc.body).lineHeight) || 38
-  if (!(pitch > 0) || !(columnHeight > 0)) return false
-  let moved = false
+  const line = parseFloat(win.getComputedStyle(doc.body).lineHeight)
+  if (!(columnWidth > 0) || !(columnHeight > 0) || !(line > 0)) return false
+  let changed = false
   for (const figure of figures) {
-    if (!figure.dataset.anchor) figure.dataset.anchor = figure.previousElementSibling?.id ?? ''
-    const anchor = doc.getElementById(figure.dataset.anchor)
-    if (!anchor) continue
-    const before = figure.dataset.sig ?? ''
-    unsplitIllustrations(doc)
-    const paragraphs = [...anchor.parentElement.children].filter(e => e.matches('p[id]'))
-    const at = paragraphs.indexOf(anchor)
-    // 그림을 잠시 빼고 글이 원래 어떻게 쪽에 놓이는지 잰다.
-    figure.style.display = 'none'
-    const box = html.getBoundingClientRect()
-    const padLeft = parseFloat(st.paddingLeft) || 0
-    const columnOf = x => Math.floor((x - box.left - padLeft + 1) / pitch)
-    const info = []
-    for (let i = Math.max(0, at - ILLUSTRATION_RANGE.before); i <= Math.min(paragraphs.length - 1, at + ILLUSTRATION_RANGE.after); i++) {
-      const range = doc.createRange()
-      range.selectNodeContents(paragraphs[i])
-      const lines = [...range.getClientRects()].filter(r => r.width > 0)
-      if (!lines.length) continue
-      const first = lines[0], last = lines[lines.length - 1]
-      info.push({ i, blank: Math.max(0, columnHeight - (last.bottom - box.top)), startCol: columnOf(first.left), endCol: columnOf(last.left) })
-    }
-    let target = anchor, splitAt = -1
-    const clean = info.filter(c => c.blank < lineHeight * ILLUSTRATION_RANGE.cleanBlankLines)
-      .map(c => ({ ...c, cost: c.blank + Math.abs(c.i - at) * lineHeight * ILLUSTRATION_RANGE.distanceWeight }))
-      .sort((a, b) => a.cost - b.cost)[0]
-    if (clean) target = paragraphs[clean.i]
-    else {
-      const straddle = info.filter(c => c.endCol > c.startCol).sort((a, b) => Math.abs(a.i - at) - Math.abs(b.i - at))[0]
-      const text = straddle && paragraphs[straddle.i].firstChild
-      if (straddle && text?.nodeType === 3 && paragraphs[straddle.i].childNodes.length === 1) {
-        // 다음 쪽(단)에 놓이는 첫 글자를 찾는다(글자 순서대로 단 번호가 커지므로 이분 탐색).
-        const charCol = k => { const r = doc.createRange(); r.setStart(text, k); r.setEnd(text, k + 1); return columnOf(r.getBoundingClientRect().left) }
-        let lo = 0, hi = text.length - 1
-        while (lo < hi) { const mid = (lo + hi) >> 1; if (charCol(mid) > straddle.startCol) hi = mid; else lo = mid + 1 }
-        // 낱말이 쪼개지지 않게, 다음 쪽 첫 글자가 낱말 중간이면 그 낱말의 처음(앞 띄어쓰기 바로 뒤)으로 물러난다.
-        let k = lo
-        while (k > 0 && !/\s/.test(text.data[k - 1])) k--
-        if (k === 0) k = lo
-        if (lo > 0 && charCol(lo) > straddle.startCol) { target = paragraphs[straddle.i]; splitAt = k }
-      }
-      if (splitAt < 0 && info.length) {
-        const any = info.map(c => ({ ...c, cost: c.blank + Math.abs(c.i - at) * lineHeight * ILLUSTRATION_RANGE.distanceWeight })).sort((a, b) => a.cost - b.cost)[0]
-        target = paragraphs[any.i]
-      }
-    }
-    figure.style.display = ''
-    if (splitAt > 0) {
-      const cont = doc.createElement('p')
-      cont.className = [SPLIT_CLASS, ...target.classList].join(' ')
-      cont.dataset.splitOf = target.id
-      cont.append(target.firstChild.splitText(splitAt))
-      target.after(cont)
-    }
-    target.after(figure)
-    figure.dataset.placedAfter = target.id + (splitAt > 0 ? `@${splitAt}` : '')
-    figure.dataset.sig = figure.dataset.placedAfter
-    if (figure.dataset.sig !== before) moved = true
+    const img = figure.querySelector('img')
+    if (!img) continue
+    if (!img.complete) img.addEventListener('load', scheduleIllustrations, { once: true })
+    const ratio = img.naturalWidth ? img.naturalHeight / img.naturalWidth : 2802 / 2000
+    const room = columnHeight - line * 4
+    // foliate가 그림에 거는 최대 높이(화면 높이 - 위아래 여백, !important)도 넘지 않게 한다.
+    const cap = parseFloat(win.getComputedStyle(img).maxHeight)
+    const limit = Math.min(columnWidth * ratio, room, cap > 0 ? cap : Infinity)
+    const lines = Math.max(3, Math.floor(limit / line))
+    const height = lines * line
+    const width = Math.min(columnWidth, height / ratio)
+    const sig = `${width.toFixed(2)}x${height.toFixed(2)}@${line.toFixed(2)}`
+    if (figure.dataset.sig === sig) continue
+    Object.assign(figure.style, { paddingTop: `${line}px`, paddingBottom: `${line}px`, margin: '0', height: 'auto' })
+    Object.assign(img.style, { width: `${width}px`, height: `${height}px` })
+    figure.dataset.sig = sig
+    changed = true
   }
-  return moved
+  return changed
 }
 let illustrationTimer
 const scheduleIllustrations = () => {
   clearTimeout(illustrationTimer)
   illustrationTimer = setTimeout(() => {
     for (const { doc } of view?.renderer?.getContents?.() ?? []) {
-      if (doc && placeIllustrations(doc)) view.renderer.render?.()
+      if (doc && sizeIllustrations(doc)) view.renderer.render?.()
     }
   }, 250)
 }
