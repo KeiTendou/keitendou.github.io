@@ -1,7 +1,8 @@
 // 리더: foliate-js로 EPUB을 열고 쪽 넘김, 목차, 보기 설정, 읽던 위치 저장을 처리한다.
 import '../vendor/foliate-js/view.js'
 
-const KEY_SETTINGS = 'kt-reader:settings'
+const KEY_SETTINGS = 'kt-reader:settings:v2'
+const KEY_SETTINGS_V1 = 'kt-reader:settings'
 const keyPos = id => `kt-reader:pos:${id}`
 const store = {
   get(key) {
@@ -12,8 +13,18 @@ const store = {
   },
 }
 
-const DEFAULTS = { fontSize: 100, lineHeight: 1.8, theme: 'light', font: 'serif', flow: 'paginated', spread: 'auto' }
-const settings = { ...DEFAULTS, ...(store.get(KEY_SETTINGS) || {}) }
+// 기본값은 구글 Play 북(글꼴 원본, 크기 100%, 행 간격 100%, 왼쪽 정렬)에서 잰 화면에 맞췄다(2026-10-04).
+// Play 북은 같은 글자 크기에서 줄 사이가 글자 크기의 약 2.5배였다.
+const DEFAULTS = { fontSize: 100, lineHeight: 2.5, align: 'left', theme: 'light', font: 'serif', flow: 'paginated', spread: 'auto' }
+const loadSettings = () => {
+  const saved = store.get(KEY_SETTINGS)
+  if (saved) return saved
+  // 예전 설정은 줄 간격만 새 기본값으로 바꾸고 나머지(배경, 글자 크기 등)는 이어 쓴다.
+  const old = store.get(KEY_SETTINGS_V1) || {}
+  delete old.lineHeight
+  return old
+}
+const settings = { ...DEFAULTS, ...loadSettings() }
 
 const $ = sel => document.querySelector(sel)
 const page = document.body
@@ -42,8 +53,11 @@ const bookCSS = s => {
   return `
 @import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600&display=swap");
 html { color-scheme: ${dark ? 'dark' : 'light'}; background: ${t.bg} !important; color: ${t.fg} !important; font-size: ${s.fontSize}% !important; }
-body { font-family: ${FONTS[s.font] ?? FONTS.serif} !important; color: inherit !important; }
+body { font-family: ${FONTS[s.font] ?? FONTS.serif} !important; color: inherit !important; text-align: ${s.align === 'justify' ? 'justify' : 'left'} !important; }
 body, p, .dialogue { line-height: ${s.lineHeight} !important; }
+.gap { height: ${s.lineHeight}em !important; }
+.gap-2 { height: ${s.lineHeight * 2}em !important; }
+.gap-3 { height: ${s.lineHeight * 3}em !important; }
 p { widows: 2; orphans: 2; }
 ${embedded ? 'html { touch-action: pan-y pinch-zoom; }' : ''}
 ${dark ? `
@@ -61,8 +75,18 @@ let book
 let chromeTimer
 let saveTimer
 
+// 화면 종류. desk: 넓은 화면에서 직접 연 경우(Play 북 PC처럼 위아래 막대를 늘 보임),
+// phone: 휴대폰 등 좁은 화면(Play 북 앱처럼 글만 보이고 가운데를 누르면 막대가 나옴), embed: 블로그 글 안.
+const layoutMode = () => {
+  const w = window.innerWidth
+  const h = window.innerHeight
+  if (embedded) return w < 600 ? 'phone' : 'embed'
+  return w >= 900 && h >= 560 ? 'desk' : 'phone'
+}
+const chromeFixed = () => page.classList.contains('chrome-fixed')
+
 const setChrome = visible => {
-  page.classList.toggle('chrome-hidden', !visible)
+  page.classList.toggle('chrome-hidden', !visible && !chromeFixed())
   clearTimeout(chromeTimer)
 }
 const toggleChrome = () => setChrome(page.classList.contains('chrome-hidden'))
@@ -83,27 +107,76 @@ const applyStyles = () => {
   document.documentElement.dataset.theme = settings.theme
   view?.renderer.setStyles?.(bookCSS(settings))
 }
+// 쪽 여백. Play 북 PC 화면은 한 쪽 글 너비 약 600px, 두 쪽 사이 약 100px, 위아래 막대 아래 넉넉한 여백이었다.
+// foliate의 좌우 여백은 화면 폭 x gap(바깥 여백과 단 안쪽 여백의 합)이다. 휴대폰은 7%로 390px 폭에서 약 27px씩.
+const LAYOUT = {
+  desk: { margin: '96px', gap: '7%' },
+  embed: { margin: '40px', gap: '9%' },
+  phone: { margin: '44px', gap: '7%' },
+}
+const setAttr = (el, name, value) => {
+  if (value === null) { if (el.hasAttribute(name)) el.removeAttribute(name) }
+  else if (el.getAttribute(name) !== value) el.setAttribute(name, value)
+}
 const applyLayout = () => {
   if (!view) return
+  const mode = layoutMode()
+  const fixed = mode === 'desk' && settings.flow === 'paginated'
+  page.dataset.layout = mode
+  page.classList.toggle('chrome-fixed', fixed)
+  if (fixed) page.classList.remove('chrome-hidden')
   const r = view.renderer
-  r.setAttribute('flow', settings.flow)
-  r.setAttribute('max-column-count', settings.spread === 'single' ? '1' : '2')
-  r.setAttribute('max-inline-size', '660px')
-  r.setAttribute('margin', embedded ? '40px' : '48px')
-  r.setAttribute('gap', embedded ? '9%' : '6%')
-  if (settings.flow === 'paginated') r.setAttribute('animated', '')
-  else r.removeAttribute('animated')
+  setAttr(r, 'flow', settings.flow)
+  setAttr(r, 'max-column-count', settings.spread === 'single' ? '1' : '2')
+  setAttr(r, 'max-inline-size', '700px')
+  setAttr(r, 'margin', LAYOUT[mode].margin)
+  setAttr(r, 'gap', LAYOUT[mode].gap)
+  setAttr(r, 'animated', settings.flow === 'paginated' ? '' : null)
+  document.documentElement.style.setProperty('--page-margin', LAYOUT[mode].margin)
+  requestAnimationFrame(updateSpine)
+}
+
+// 한 화면에 보이는 단 수(넓은 화면 2쪽 펼침이면 2)
+const columnCount = () => {
+  const r = view?.renderer
+  const doc = r?.getContents?.()?.[0]?.doc
+  if (!doc || settings.flow !== 'paginated' || !r.size) return 1
+  const st = doc.defaultView.getComputedStyle(doc.documentElement)
+  const unit = parseFloat(st.columnWidth) + parseFloat(st.columnGap)
+  return unit > 0 ? Math.max(1, Math.round(r.size / unit)) : 1
+}
+// 두 쪽 펼침일 때 가운데에 Play 북처럼 옅은 접힘 그림자를 둔다.
+const updateSpine = () => {
+  $('#spine').hidden = !(view && columnCount() === 2)
 }
 const saveSettings = () => store.set(KEY_SETTINGS, settings)
 
 const percent = f => `${Math.max(0, Math.min(100, Math.round((f ?? 0) * 100)))}%`
 
+// 편 안에서의 쪽 번호. 한 단을 한 쪽으로 센다(두 쪽 펼침이면 "11–12 / 40").
+const pageInfo = () => {
+  const r = view.renderer
+  if (settings.flow !== 'paginated' || !(r.pages > 2)) return null
+  const cols = columnCount()
+  const screens = r.pages - 2
+  const screen = Math.min(Math.max(r.page, 1), screens)
+  const total = screens * cols
+  const first = (screen - 1) * cols + 1
+  return { first, last: first + cols - 1, total }
+}
+const pageText = info => !info ? '' : info.last > info.first
+  ? `${info.first}–${info.last} / ${info.total}`
+  : `${info.first} / ${info.total}`
+
 const onRelocate = e => {
   const { fraction, tocItem, cfi } = e.detail
+  const part = tocItem ? view.book.toc.findIndex(t => t.href === tocItem.href) + 1 : 0
+  const info = part > 0 ? pageInfo() : null
   $('#slider').value = String(fraction ?? 0)
-  $('#loc-title').textContent = tocItem?.label?.trim() || book.title
-  $('#loc-pct').textContent = percent(fraction)
-  $('#peek').textContent = percent(fraction)
+  $('#loc-title').textContent = part > 0 ? `${part}편 「${tocItem.label.trim()}」` : book.title
+  $('#loc-page').textContent = info ? pageText(info) : percent(fraction)
+  $('#peek').textContent = info ? `${info.first} / ${info.total}` : ''
+  updateSpine()
   for (const b of document.querySelectorAll('#toc-list button'))
     b.setAttribute('aria-current', String(!!tocItem && b.dataset.href === tocItem.href))
   clearTimeout(saveTimer)
@@ -267,7 +340,8 @@ const buildSettings = () => {
 
   body.append(
     sizeRow,
-    seg('줄 간격', 'lineHeight', [[1.6, '좁게'], [1.8, '보통'], [2.05, '넓게']]),
+    seg('줄 간격', 'lineHeight', [[1.8, '좁게'], [2.5, '보통'], [2.9, '넓게']]),
+    seg('정렬', 'align', [['left', '왼쪽 맞춤'], ['justify', '양쪽 맞춤']]),
     seg('배경', 'theme', [['light', '밝게', 'swatch-light'], ['sepia', '세피아', 'swatch-sepia'], ['dark', '어둡게', 'swatch-dark']]),
     seg('글꼴', 'font', [['serif', '명조'], ['sans', '고딕']]),
     seg('넘김', 'flow', [['paginated', '쪽 넘김'], ['scrolled', '스크롤']]),
@@ -337,9 +411,27 @@ const main = async () => {
   $('#loading').remove()
   window.readerReady = true
 
-  // 처음에는 메뉴를 잠깐 보여 주고 숨긴다
+  // 처음에는 메뉴를 잠깐 보여 주고 숨긴다(넓은 화면에서는 계속 보임)
   setChrome(true)
   chromeTimer = setTimeout(() => setChrome(false), 2500)
+
+  let resizeTimer
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer)
+    resizeTimer = setTimeout(applyLayout, 150)
+  })
+  // 전체 화면(Play 북 상단의 전체 화면 단추). 지원하지 않는 브라우저(아이폰 사파리 등)에서는 숨긴다.
+  if (document.fullscreenEnabled) {
+    const fs = $('#btn-fullscreen')
+    fs.hidden = false
+    fs.addEventListener('click', () => {
+      if (document.fullscreenElement) document.exitFullscreen?.()
+      else document.documentElement.requestFullscreen?.().catch(() => {})
+    })
+    document.addEventListener('fullscreenchange', () => {
+      fs.setAttribute('aria-label', document.fullscreenElement ? '전체 화면 끝내기' : '전체 화면')
+    })
+  }
 
   $('#btn-prev').addEventListener('click', () => view.goLeft())
   $('#btn-next').addEventListener('click', () => view.goRight())
