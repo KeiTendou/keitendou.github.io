@@ -71,6 +71,8 @@ body, p, .dialogue { line-height: ${s.lineHeight} !important; }
 .gap-2 { height: ${s.lineHeight * 2}em !important; }
 .gap-3 { height: ${s.lineHeight * 3}em !important; }
 p { widows: ${layoutMode() === 'desk' ? 2 : 1}; orphans: ${layoutMode() === 'desk' ? 2 : 1}; }
+.illustration { box-sizing: border-box; height: calc(100vh - 2px); display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.illustration img { max-width: 100%; max-height: calc(100vh - 2px); width: auto; height: auto; }
 ${embedded ? 'html { touch-action: pan-y pinch-zoom; }' : ''}
 ${dark ? `
 .cover h1, .author, .toc a, a { color: #d9b8df !important; }
@@ -154,6 +156,60 @@ const fitPage = () => {
   const margin = `${fitMargin(layoutMode())}px`
   setAttr(view.renderer, 'margin', margin)
   document.documentElement.style.setProperty('--page-margin', margin)
+  scheduleIllustrations()
+}
+
+// 한 쪽 전체를 쓰는 삽화(figure.illustration, 앞뒤에서 쪽을 나눔, 쪽 가운데에 놓음).
+// EPUB에는 정해진 행 뒤에 들어 있지만, 그 자리에서 쪽을 강제로 나누면 화면에 따라 앞쪽이 덜 찬 채 끝난다.
+// 그래서 정해진 행 근처(앞 2문단~뒤 3문단) 중 그 화면에서 쪽이 가장 꽉 차게 끝나는 문단 뒤로 그림을 옮긴다.
+// 남는 빈칸이 비슷하면 정해진 행에 가까운 쪽을 고른다(문단 하나 멀어질 때마다 줄 높이의 0.35배를 더함). 2026-10-04
+const ILLUSTRATION_RANGE = { before: 2, after: 3, distanceWeight: 0.35 }
+const placeIllustrations = doc => {
+  const figures = [...doc.querySelectorAll('figure.illustration')]
+  if (!figures.length || settings.flow !== 'paginated') return false
+  const html = doc.documentElement
+  const win = doc.defaultView
+  const st = win.getComputedStyle(html)
+  const pitch = parseFloat(st.columnWidth) + parseFloat(st.columnGap)
+  const columnHeight = html.clientHeight
+  const lineHeight = parseFloat(win.getComputedStyle(doc.body).lineHeight) || 38
+  if (!(pitch > 0) || !(columnHeight > 0)) return false
+  let moved = false
+  for (const figure of figures) {
+    if (!figure.dataset.anchor) figure.dataset.anchor = figure.previousElementSibling?.id ?? ''
+    const anchor = doc.getElementById(figure.dataset.anchor)
+    if (!anchor) continue
+    const paragraphs = [...anchor.parentElement.children].filter(e => e.matches('p[id]'))
+    const at = paragraphs.indexOf(anchor)
+    // 그림을 잠시 빼고 글이 원래 어떻게 쪽에 놓이는지 잰다.
+    figure.style.display = 'none'
+    const box = html.getBoundingClientRect()
+    let best = null
+    for (let i = Math.max(0, at - ILLUSTRATION_RANGE.before); i <= Math.min(paragraphs.length - 1, at + ILLUSTRATION_RANGE.after); i++) {
+      const range = doc.createRange()
+      range.selectNodeContents(paragraphs[i])
+      const lines = [...range.getClientRects()].filter(r => r.width > 0)
+      const last = lines[lines.length - 1]
+      if (!last) continue
+      const blank = Math.max(0, columnHeight - (last.bottom - box.top))
+      const cost = blank + Math.abs(i - at) * lineHeight * ILLUSTRATION_RANGE.distanceWeight
+      if (!best || cost < best.cost) best = { i, cost, blank }
+    }
+    figure.style.display = ''
+    const target = best ? paragraphs[best.i] : anchor
+    if (target.nextElementSibling !== figure) { target.after(figure); moved = true }
+    figure.dataset.placedAfter = target.id
+  }
+  return moved
+}
+let illustrationTimer
+const scheduleIllustrations = () => {
+  clearTimeout(illustrationTimer)
+  illustrationTimer = setTimeout(() => {
+    for (const { doc } of view?.renderer?.getContents?.() ?? []) {
+      if (doc && placeIllustrations(doc)) view.renderer.render?.()
+    }
+  }, 250)
 }
 let lastMode = null
 const applyLayout = () => {
@@ -276,6 +332,7 @@ const guardTouches = target => {
 const onLoadSection = e => {
   const { doc } = e.detail
   requestAnimationFrame(fitPage)
+  doc.fonts?.ready?.then(scheduleIllustrations)
   guardTouches(doc)
   doc.addEventListener('keydown', onKey)
   doc.addEventListener('click', ev => {
