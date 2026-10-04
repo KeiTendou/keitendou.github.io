@@ -49,7 +49,7 @@ const FONTS = {
 // - 글꼴: 웹 글꼴 대신 책에 지정된 글꼴 목록 그대로(휴대폰에는 없으므로 Play 북 '원본'처럼 휴대폰 기본 글꼴로 그려짐)
 // - 글자: 약 1.145배(15.2px에서 17.4px, 사용자 요청으로 18.4px에서 낮춤), 줄 사이는 38px 그대로(줄 간격 배수 x0.8734, 2.5에서 약 2.18)
 // - 밝은 테마 글자색: 완전한 검정(Play 북 글자 픽셀의 약 3분의 2가 #000)
-const PHONE = { scale: 1.145, lineFactor: 0.8734, serif: '"KoPub Batang", "Nanum Myeongjo", "Batang", serif', fg: '#000000' }
+const PHONE = { scale: 0.6184, lineFactor: 1.617, serif: '"KoPub Batang", "Nanum Myeongjo", "Batang", serif', fg: '#000000' }
 
 // 책 문서(iframe) 안에 넣는 CSS. 책 자체 CSS는 그대로 두고 필요한 것만 덮어쓴다.
 const bookCSS = settingsNow => {
