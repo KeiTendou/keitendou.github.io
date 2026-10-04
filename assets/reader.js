@@ -143,7 +143,8 @@ const fitMargin = mode => {
   if (mode === 'desk' || settings.flow !== 'paginated') return base
   const pitch = linePitch()
   const height = $('#viewer').clientHeight || window.innerHeight
-  const lines = Math.floor((height - 2 * base) / pitch)
+  // 줄 높이가 38.0007px처럼 소수점 아래로 조금 넘쳐도 한 줄을 잃지 않게 작은 여유를 둔다.
+  const lines = Math.floor((height - 2 * base) / pitch + 0.01)
   if (!(pitch > 0) || lines < 4) return base
   return Math.floor((height - lines * pitch) / 2)
 }
