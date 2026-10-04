@@ -46,13 +46,11 @@ const FONTS = {
   sans: '"Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif',
 }
 // 휴대폰: 갤럭시 Play 북 앱 캡처(1080x2340, 2026-10-04) 실측에 맞춘다.
-// - 글꼴: Noto Serif KR 굵기 500(사용자가 비교 주소 중 고름). Play 북 획 두께는 굵기 550~600에 가까웠다(글자 높이 대비 0.101).
+// - 글꼴: Noto Serif KR 굵기 540(사용자가 비교 주소 500, 550, 600을 보고 정함). Play 북 획 두께는 굵기 550~600에 가까웠다(글자 높이 대비 0.101).
 //   휴대폰 기본 글꼴(sans-serif, system-ui), 마루 부리, 리디바탕은 비교에서 더 멀었다.
 // - 글자: 약 1.092배(15.2px에서 16.6px, 사용자 요청으로 18.4px, 17.4px, 16.4px를 거쳐 정함), 줄 사이는 38px 그대로(줄 간격 배수 x0.91575, 2.5에서 약 2.29)
 // - 밝은 테마 글자색: 완전한 검정(Play 북 글자 픽셀의 약 3분의 2가 #000)
-const PHONE = { scale: 1.0921, lineFactor: 0.91575, weight: 500, fg: '#000000' }
-// 2026-10-04 휴대폰 글꼴 굵기 비교용 임시 주소(저장 안 함). ?f=6: 굵기 550, ?f=7: 굵기 600
-const WEIGHT_TEST = { 6: 550, 7: 600 }[params.get('f')] ?? null
+const PHONE = { scale: 1.0921, lineFactor: 0.91575, weight: 540, fg: '#000000' }
 
 // 책 문서(iframe) 안에 넣는 CSS. 책 자체 CSS는 그대로 두고 필요한 것만 덮어쓴다.
 const bookCSS = settingsNow => {
@@ -61,7 +59,7 @@ const bookCSS = settingsNow => {
   const t = THEMES[s.theme] ?? THEMES.light
   const dark = s.theme === 'dark'
   const serif = s.font !== 'sans'
-  const weight = phone && serif ? (WEIGHT_TEST ?? PHONE.weight) : null
+  const weight = phone && serif ? PHONE.weight : null
   const fg = phone && s.theme === 'light' ? PHONE.fg : t.fg
   return `
 @import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@${weight && weight % 100 ? '400..700' : '400;500;600'}&display=swap");
@@ -216,7 +214,7 @@ const onRelocate = e => {
   $('#slider').value = String(fraction ?? 0)
   $('#loc-title').textContent = part > 0 ? `${part}편 「${tocItem.label.trim()}」` : book.title
   $('#loc-page').textContent = info ? pageText(info) : percent(fraction)
-  $('#peek').textContent = (info ? `${info.first} / ${info.total}` : '') + (WEIGHT_TEST ? `   굵기 ${WEIGHT_TEST}` : '')
+  $('#peek').textContent = info ? `${info.first} / ${info.total}` : ''
   updateSpine()
   for (const b of document.querySelectorAll('#toc-list button'))
     b.setAttribute('aria-current', String(!!tocItem && b.dataset.href === tocItem.href))
