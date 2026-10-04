@@ -46,24 +46,13 @@ const FONTS = {
   sans: '"Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif',
 }
 // 휴대폰: 갤럭시 Play 북 앱 캡처(1080x2340, 2026-10-04) 실측에 맞춘다.
-// - 글꼴: 웹 글꼴 대신 책에 지정된 글꼴 목록 그대로(휴대폰에는 없으므로 Play 북 '원본'처럼 휴대폰 기본 글꼴로 그려짐)
+// - 글꼴: Noto Serif KR 굵기 500(사용자가 비교 주소 중 고름). Play 북 획 두께는 굵기 550~600에 가까웠다(글자 높이 대비 0.101).
+//   휴대폰 기본 글꼴(sans-serif, system-ui), 마루 부리, 리디바탕은 비교에서 더 멀었다.
 // - 글자: 약 1.079배(15.2px에서 16.4px, 사용자 요청으로 18.4px, 17.4px를 거쳐 낮춤), 줄 사이는 38px 그대로(줄 간격 배수 x0.9268, 2.5에서 약 2.32)
 // - 밝은 테마 글자색: 완전한 검정(Play 북 글자 픽셀의 약 3분의 2가 #000)
-const PHONE = { scale: 1.079, lineFactor: 0.9268, serif: '"KoPub Batang", "Nanum Myeongjo", "Batang", serif', fg: '#000000' }
-// 2026-10-04 휴대폰 글꼴 비교용 임시 주소(저장 안 함). ?f=3: 마루 부리, ?f=4: 리디바탕, ?f=5: Noto Serif KR 조금 굵게(500)
-const FONT_TEST = {
-  3: { family: 'MaruBuri, serif', face: ['MaruBuri', 'fonts/MaruBuri-Regular.woff2', 'woff2'] },
-  4: { family: 'RIDIBatang, serif', face: ['RIDIBatang', 'fonts/RIDIBatang.woff', 'woff'] },
-  5: { family: '"Noto Serif KR", serif', weight: 500 },
-}[params.get('f')] ?? null
-const fontTestCSS = () => {
-  if (!FONT_TEST) return ''
-  if (FONT_TEST.face) {
-    const [name, file, format] = FONT_TEST.face
-    return `@font-face { font-family: ${name}; src: url("${new URL(file, ROOT).href}") format("${format}"); font-display: swap; }`
-  }
-  return `body { font-weight: ${FONT_TEST.weight} !important; }`
-}
+const PHONE = { scale: 1.079, lineFactor: 0.9268, weight: 500, fg: '#000000' }
+// 2026-10-04 휴대폰 글꼴 굵기 비교용 임시 주소(저장 안 함). ?f=6: 굵기 550, ?f=7: 굵기 600
+const WEIGHT_TEST = { 6: 550, 7: 600 }[params.get('f')] ?? null
 
 // 책 문서(iframe) 안에 넣는 CSS. 책 자체 CSS는 그대로 두고 필요한 것만 덮어쓴다.
 const bookCSS = settingsNow => {
@@ -72,14 +61,13 @@ const bookCSS = settingsNow => {
   const t = THEMES[s.theme] ?? THEMES.light
   const dark = s.theme === 'dark'
   const serif = s.font !== 'sans'
-  const test = phone && serif ? FONT_TEST : null
-  const family = phone && serif ? (test?.family ?? PHONE.serif) : (FONTS[s.font] ?? FONTS.serif)
+  const weight = phone && serif ? (WEIGHT_TEST ?? PHONE.weight) : null
   const fg = phone && s.theme === 'light' ? PHONE.fg : t.fg
   return `
-${phone && serif && !test?.weight ? '' : '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600&display=swap");'}
-${test ? fontTestCSS() : ''}
+@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@${weight && weight % 100 ? '400..700' : '400;500;600'}&display=swap");
 html { color-scheme: ${dark ? 'dark' : 'light'}; background: ${t.bg} !important; color: ${fg} !important; font-size: ${s.fontSize}% !important; }
-body { font-family: ${family} !important; color: inherit !important; text-align: ${s.align === 'justify' ? 'justify' : 'left'} !important; }
+body { font-family: ${FONTS[s.font] ?? FONTS.serif} !important; color: inherit !important; text-align: ${s.align === 'justify' ? 'justify' : 'left'} !important; }
+${weight ? `body { font-weight: ${weight} !important; }` : ''}
 body, p, .dialogue { line-height: ${s.lineHeight} !important; }
 .gap { height: ${s.lineHeight}em !important; }
 .gap-2 { height: ${s.lineHeight * 2}em !important; }
@@ -228,7 +216,7 @@ const onRelocate = e => {
   $('#slider').value = String(fraction ?? 0)
   $('#loc-title').textContent = part > 0 ? `${part}편 「${tocItem.label.trim()}」` : book.title
   $('#loc-page').textContent = info ? pageText(info) : percent(fraction)
-  $('#peek').textContent = (info ? `${info.first} / ${info.total}` : '') + (FONT_TEST ? `   글꼴 ${params.get('f')}` : '')
+  $('#peek').textContent = (info ? `${info.first} / ${info.total}` : '') + (WEIGHT_TEST ? `   굵기 ${WEIGHT_TEST}` : '')
   updateSpine()
   for (const b of document.querySelectorAll('#toc-list button'))
     b.setAttribute('aria-current', String(!!tocItem && b.dataset.href === tocItem.href))
