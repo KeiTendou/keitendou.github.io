@@ -18,7 +18,11 @@ const settings = { ...DEFAULTS, ...(store.get(KEY_SETTINGS) || {}) }
 const $ = sel => document.querySelector(sel)
 const page = document.body
 const params = new URLSearchParams(location.search)
-const bookId = params.get('book')
+// 사이트 루트(assets/의 상위). 책별 공유 주소(/fall/ 등)에서 열려도 같은 파일을 찾게 한다.
+const ROOT = new URL('../', import.meta.url)
+const bookId = params.get('book') || document.body.dataset.book
+// ?part=2처럼 열면 그 편(목차 항목)부터 시작한다.
+const startPart = Number.parseInt(params.get('part') ?? '', 10)
 const embedded = window.self !== window.top
 
 const THEMES = {
@@ -279,7 +283,7 @@ const showError = msg => {
   const p = document.createElement('p')
   p.textContent = msg
   const a = document.createElement('a')
-  a.href = 'index.html'
+  a.href = new URL('index.html', ROOT).href
   a.textContent = '서재로 돌아가기'
   box.append(p, a)
   document.body.append(box)
@@ -294,7 +298,7 @@ const main = async () => {
   }
   let books
   try {
-    books = await (await fetch('books.json', { cache: 'no-cache' })).json()
+    books = await (await fetch(new URL('books.json', ROOT), { cache: 'no-cache' })).json()
   } catch {
     return showError('책 목록을 불러오지 못했습니다.')
   }
@@ -310,7 +314,7 @@ const main = async () => {
   view.addEventListener('relocate', onRelocate)
   view.addEventListener('click', e => handleTap(e.clientX, e.target))
   try {
-    await view.open(book.file)
+    await view.open(new URL(book.file, ROOT).href)
   } catch (e) {
     console.error(e)
     return showError('책 파일을 열지 못했습니다.')
@@ -321,8 +325,10 @@ const main = async () => {
   buildSettings()
 
   const saved = store.get(keyPos(book.id))
+  const partHref = startPart > 0 ? view.book.toc?.[startPart - 1]?.href : null
   try {
-    await view.init({ lastLocation: saved?.cfi ?? null })
+    if (partHref) await view.init({ lastLocation: partHref })
+    else await view.init({ lastLocation: saved?.cfi ?? null })
   } catch (e) {
     console.warn('저장 위치로 이동 실패, 처음부터 엽니다.', e)
     await view.init({})

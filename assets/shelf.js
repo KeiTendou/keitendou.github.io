@@ -20,7 +20,7 @@ const el = (tag, attrs = {}, ...children) => {
 const percent = f => `${Math.max(0, Math.min(100, Math.round(f * 100)))}%`
 
 const renderBook = book => {
-  const href = `reader.html?book=${encodeURIComponent(book.id)}`
+  const href = book.share ? book.share : `reader.html?book=${encodeURIComponent(book.id)}`
   const saved = store.get(`kt-reader:pos:${book.id}`)
   const started = saved && typeof saved.fraction === 'number' && saved.fraction > 0.005
 

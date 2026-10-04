@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline' blob: https://fonts.googleapis.com; font-src 'self' blob: data: https://fonts.gstatic.com; img-src 'self' blob: data:; connect-src 'self' blob: data:; frame-src blob: data:; object-src 'none'; base-uri 'self'; form-action 'none'">
+<title>추락, 이승, 발자국 - 번역 서재</title>
+<meta name="description" content="大豆ビル 님의 「墜落、此岸、足跡」와 후속편 「太陽は天にいまし、我らは地にあり」를 한국어로 옮겨 한 권으로 묶었습니다.">
+<meta property="og:type" content="book">
+<meta property="og:site_name" content="번역 서재">
+<meta property="og:title" content="추락, 이승, 발자국">
+<meta property="og:description" content="大豆ビル 님의 「墜落、此岸、足跡」와 후속편 「太陽は天にいまし、我らは地にあり」를 한국어로 옮겨 한 권으로 묶었습니다.">
+<meta property="og:url" content="https://keitendou.github.io/fall/">
+<meta property="og:image" content="https://keitendou.github.io/covers/fall.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600&display=swap">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/style.css">
+<script type="module" src="../assets/reader.js"></script>
+</head>
+<body class="reader-page" data-book="fall">
+<div id="viewer"></div>
+<div class="loading" id="loading">책을 여는 중…</div>
+
+<header class="bar bar-top">
+  <a class="icon-btn" id="btn-back" href="../index.html" aria-label="서재로">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+    <span>서재</span>
+  </a>
+  <div class="bar-title" id="title"></div>
+  <button class="icon-btn" id="btn-toc" type="button" aria-label="목차">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h11"/></svg>
+  </button>
+  <button class="icon-btn" id="btn-settings" type="button" aria-label="보기 설정">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19l5-14 5 14M6 14h6M15.5 19l3-8 3 8M16.5 16.5h4"/></svg>
+  </button>
+  <a class="icon-btn" id="btn-newtab" href="#" target="_blank" rel="noopener" aria-label="새 창에서 읽기" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+  </a>
+</header>
+
+<footer class="bar bar-bottom">
+  <div class="bar-row">
+    <button class="icon-btn" id="btn-prev" type="button" aria-label="이전 쪽">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <input type="range" id="slider" min="0" max="1" step="0.0005" value="0" aria-label="읽은 위치">
+    <button class="icon-btn" id="btn-next" type="button" aria-label="다음 쪽">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
+  </div>
+  <div class="bar-status"><span id="loc-title"></span><span id="loc-pct"></span></div>
+</footer>
+
+<div class="peek" id="peek" aria-hidden="true"></div>
+
+<div class="sheet-backdrop" id="backdrop" hidden></div>
+<aside class="sheet sheet-toc" id="toc-sheet" hidden aria-label="목차">
+  <h2>목차</h2>
+  <ol id="toc-list"></ol>
+  <div class="toc-meta" id="toc-meta"></div>
+</aside>
+<section class="sheet sheet-settings" id="settings-sheet" hidden aria-label="보기 설정">
+  <h2>보기 설정</h2>
+  <div id="settings-body"></div>
+</section>
+</body>
+</html>

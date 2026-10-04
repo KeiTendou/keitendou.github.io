@@ -11,12 +11,21 @@
     ],
     "description": "大豆ビル의 회천 이후 후일담 한국어 번역본. 「추락, 이승, 발자국」과 후속편 「태양은 하늘에 계시고, 우리는 땅에 있다」의 제목과 본문 전체를 수록했다.",
     "sources": [
-      { "label": "1편 원문", "url": "https://www.pixiv.net/novel/show.php?id=29115511" },
-      { "label": "2편 원문", "url": "https://www.pixiv.net/novel/show.php?id=29246664" }
+      {
+        "label": "1편 원문",
+        "url": "https://www.pixiv.net/novel/show.php?id=29115511"
+      },
+      {
+        "label": "2편 원문",
+        "url": "https://www.pixiv.net/novel/show.php?id=29246664"
+      }
     ],
     "file": "books/fall.epub",
     "sha256": "290acbe497bcaf59e30c4c7a48dc81d6ab325810c5ba39ea7f01b6a290b0576d",
     "accent": "#6d4c72",
-    "updated": "2026-10-01"
+    "updated": "2026-10-01",
+    "share": "fall/",
+    "cover": "covers/fall.png",
+    "shareDescription": "大豆ビル 님의 「墜落、此岸、足跡」와 후속편 「太陽は天にいまし、我らは地にあり」를 한국어로 옮겨 한 권으로 묶었습니다."
   }
 ]
