@@ -50,6 +50,8 @@ const FONTS = {
 // - 글자: 약 1.079배(15.2px에서 16.4px, 사용자 요청으로 18.4px, 17.4px를 거쳐 낮춤), 줄 사이는 38px 그대로(줄 간격 배수 x0.9268, 2.5에서 약 2.32)
 // - 밝은 테마 글자색: 완전한 검정(Play 북 글자 픽셀의 약 3분의 2가 #000)
 const PHONE = { scale: 1.079, lineFactor: 0.9268, serif: '"KoPub Batang", "Nanum Myeongjo", "Batang", serif', fg: '#000000' }
+// 2026-10-04 휴대폰 글꼴 비교용 임시 주소(저장 안 함). ?f=1: sans-serif, ?f=2: system-ui
+const FONT_TEST = { 1: 'sans-serif', 2: 'system-ui, sans-serif' }[params.get('f')] ?? null
 
 // 책 문서(iframe) 안에 넣는 CSS. 책 자체 CSS는 그대로 두고 필요한 것만 덮어쓴다.
 const bookCSS = settingsNow => {
@@ -58,7 +60,7 @@ const bookCSS = settingsNow => {
   const t = THEMES[s.theme] ?? THEMES.light
   const dark = s.theme === 'dark'
   const serif = s.font !== 'sans'
-  const family = phone && serif ? PHONE.serif : (FONTS[s.font] ?? FONTS.serif)
+  const family = phone && serif ? (FONT_TEST ?? PHONE.serif) : (FONTS[s.font] ?? FONTS.serif)
   const fg = phone && s.theme === 'light' ? PHONE.fg : t.fg
   return `
 ${phone && serif ? '' : '@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600&display=swap");'}
@@ -212,7 +214,7 @@ const onRelocate = e => {
   $('#slider').value = String(fraction ?? 0)
   $('#loc-title').textContent = part > 0 ? `${part}편 「${tocItem.label.trim()}」` : book.title
   $('#loc-page').textContent = info ? pageText(info) : percent(fraction)
-  $('#peek').textContent = info ? `${info.first} / ${info.total}` : ''
+  $('#peek').textContent = (info ? `${info.first} / ${info.total}` : '') + (FONT_TEST ? `   글꼴 ${params.get('f')}` : '')
   updateSpine()
   for (const b of document.querySelectorAll('#toc-list button'))
     b.setAttribute('aria-current', String(!!tocItem && b.dataset.href === tocItem.href))
