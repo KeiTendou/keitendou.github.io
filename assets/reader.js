@@ -241,7 +241,9 @@ const fitPage = () => {
 // 그림 아래 글 자리: 휴대폰과 블로그 글 안은 적어도 두 줄. PC는 「실례했습니다」와 다음 문단이 함께 들어가도록 다섯 줄
 // (PC에서 그림이 쪽 높이만큼 커지면 다음 문단이 다음 쪽으로 밀렸다. 2026-10-04. 휴대폰은 사용자가 마음에 들어 해 그대로 둠).
 // (이전의 화면별 자리 옮김, 문단 나눔 방식은 사용자 요청으로 뺐다.)
-// 휴대폰의 가로로 긴 그림(2026-10-08): 단 너비가 아니라 화면 너비를 가득 채운다(좌우는 단 사이 여백으로 넘침).
+// 휴대폰의 가로로 긴 그림(2026-10-08): 단 너비가 아니라 화면 너비에 가깝게 채운다(좌우는 단 사이 여백으로 넘침).
+// 화면 끝에 딱 붙이지 않고 좌우에 8px씩 남긴다(사용자 요청 "미세한 여백은 있으면 좋겠어", 처음에는 0px였다).
+const PHONE_FIGURE_INSET = 8
 // 그림 높이가 줄 높이의 정수배가 아니면 모자란 만큼을 그림 위아래에 반씩 더 비워, 아래 글줄은 그대로 줄 칸에 맞춘다.
 const ILLUSTRATION_TEXT_BELOW = { desk: 5, phone: 2, embed: 2 }
 const sizeIllustrations = doc => {
@@ -270,7 +272,7 @@ const sizeIllustrations = doc => {
       // foliate는 column-width를 정수로 자르므로, 실제 단 너비(본문 상자의 첫 단 조각)에 단 사이 여백을 더해 화면 폭을 구한다.
       // (본문 상자 전체 너비는 모든 단을 합친 너비라 쓰지 않는다.)
       const used = doc.body.getClientRects()[0]?.width ?? 0
-      width = (used > columnWidth ? used : columnWidth) + columnGap
+      width = (used > columnWidth ? used : columnWidth) + columnGap - 2 * PHONE_FIGURE_INSET
       height = width * ratio
       if (height > heightLimit) {
         height = Math.max(3, Math.floor(heightLimit / line)) * line
