@@ -140,6 +140,13 @@ const LAYOUT = {
   embed: { margin: '40px', gap: '9%' },
   phone: { margin: '28px', gap: '7%' },
 }
+// 휴대폰(쪽 넘김): 가로로 긴 삽화가 화면 끝까지 닿도록(2026-10-08 사용자 요청 "가로로 긴 그림은 가로여백 최대한 없이 최대 크기로")
+// 리더를 좌우로 화면 폭의 7%씩 넓혀 foliate 바깥 여백을 화면 밖으로 보내고, gap을 14/114로 키운다.
+// 그러면 글 단의 위치와 너비(좌우 7%씩)는 그대로이고, 단 사이 여백(gap)만 화면 끝까지 그림이 쓸 수 있는 자리가 된다.
+const PHONE_BLEED = 0.07
+const PHONE_BLEED_GAP = `${(2 * PHONE_BLEED / (1 + 2 * PHONE_BLEED) * 100).toFixed(4)}%`
+const phoneBleed = mode => mode === 'phone' && settings.flow === 'paginated'
+const layoutGap = mode => phoneBleed(mode) ? PHONE_BLEED_GAP : LAYOUT[mode].gap
 const setAttr = (el, name, value) => {
   if (value === null) { if (el.hasAttribute(name)) el.removeAttribute(name) }
   else if (el.getAttribute(name) !== value) el.setAttribute(name, value)
@@ -154,11 +161,13 @@ const linePitch = () => {
 // 휴대폰과 블로그 글 안: 글 영역 높이를 한 줄 높이의 배수로 맞추고 남는 공간을 위아래에 똑같이 나눈다.
 // (예전에는 남는 공간이 모두 아래로 가서 휴대폰에서 글이 위아래로 눌린 듯 보였다. 2026-10-04)
 // 휴대폰과 PC: 위아래 여백을 줄인 만큼 한 쪽에 줄을 더 넣는다(2026-10-04 사용자 요청 "한줄이라도 더", "PC도 두줄 정도 더").
-// - 휴대폰은 위 8px, 아래는 쪽 번호와 겹치지 않을 만큼(26px)만 비운다.
+// - 휴대폰은 위아래 8px씩만 비우고, 남는 공간은 위아래에 똑같이 나눈다.
+//   (2026-10-08 사용자 요청 "밑에 페이지 표시랑 그 여백만큼 지우고 아주 살짝 내리자 전체적으로 상하 여백 균등하게".
+//    그 전에는 아래 쪽 번호 자리로 26px를 비우고 글을 위 8px에 붙였다.)
 // - PC는 Play 북 PC 화면처럼 위 66px, 아래 77px를 비운다(막대가 더 높으면 막대 높이 + 4px).
 // - 기본 줄 사이(보통 38px)로 n줄이 들어가는 화면에서, 줄 사이를 최대 6.5% 좁혀 n+1줄이 들어가면 그렇게 한다.
 // - foliate의 margin은 위아래가 같으므로, 글 영역 높이에 맞춘 margin을 주고 리더 전체를 위아래로 옮겨 위 여백을 맞춘다.
-const PHONE_EDGE = { top: 8, bottom: 26 }
+const PHONE_EDGE = { top: 8, bottom: 8 }
 let fitLine = { mode: null, pitch: 0, lines: 0, top: 0, bottom: 0 }
 const fitEdges = mode => {
   if (mode === 'phone') return PHONE_EDGE
@@ -180,7 +189,8 @@ const fitLayout = (mode, height) => {
   let lines = Math.floor(avail / base + 0.01)
   if (avail / (lines + 1) >= base * tune.minPitchRatio) lines += 1
   const pitch = Math.min(base, Math.floor((avail / lines) * 100) / 100)
-  return { mode, pitch, lines, top, bottom: height - top - lines * pitch }
+  const start = mode === 'phone' ? Math.floor((height - lines * pitch) / 2) : top
+  return { mode, pitch, lines, top: start, bottom: height - start - lines * pitch }
 }
 const fitMargin = mode => {
   const base = parseFloat(LAYOUT[mode].margin)
@@ -219,6 +229,9 @@ const fitPage = () => {
   const viewer = $('#viewer')
   viewer.style.top = shift ? `${-shift}px` : ''
   viewer.style.bottom = shift ? `${shift}px` : ''
+  const bleed = phoneBleed(mode) ? Math.round(window.innerWidth * PHONE_BLEED * 100) / 100 : 0
+  viewer.style.left = bleed ? `${-bleed}px` : ''
+  viewer.style.right = bleed ? `${-bleed}px` : ''
   scheduleIllustrations()
 }
 
@@ -228,13 +241,17 @@ const fitPage = () => {
 // 그림 아래 글 자리: 휴대폰과 블로그 글 안은 적어도 두 줄. PC는 「실례했습니다」와 다음 문단이 함께 들어가도록 다섯 줄
 // (PC에서 그림이 쪽 높이만큼 커지면 다음 문단이 다음 쪽으로 밀렸다. 2026-10-04. 휴대폰은 사용자가 마음에 들어 해 그대로 둠).
 // (이전의 화면별 자리 옮김, 문단 나눔 방식은 사용자 요청으로 뺐다.)
+// 휴대폰의 가로로 긴 그림(2026-10-08): 단 너비가 아니라 화면 너비를 가득 채운다(좌우는 단 사이 여백으로 넘침).
+// 그림 높이가 줄 높이의 정수배가 아니면 모자란 만큼을 그림 위아래에 반씩 더 비워, 아래 글줄은 그대로 줄 칸에 맞춘다.
 const ILLUSTRATION_TEXT_BELOW = { desk: 5, phone: 2, embed: 2 }
 const sizeIllustrations = doc => {
   const figures = [...doc.querySelectorAll('figure.illustration')]
   if (!figures.length || settings.flow !== 'paginated') return false
   const html = doc.documentElement
   const win = doc.defaultView
-  const columnWidth = parseFloat(win.getComputedStyle(html).columnWidth)
+  const htmlStyle = win.getComputedStyle(html)
+  const columnWidth = parseFloat(htmlStyle.columnWidth)
+  const columnGap = parseFloat(htmlStyle.columnGap) || 0
   const columnHeight = html.clientHeight
   const line = parseFloat(win.getComputedStyle(doc.body).lineHeight)
   if (!(columnWidth > 0) || !(columnHeight > 0) || !(line > 0)) return false
@@ -247,13 +264,30 @@ const sizeIllustrations = doc => {
     const room = columnHeight - line * (2 + ILLUSTRATION_TEXT_BELOW[layoutMode()])
     // foliate가 그림에 거는 최대 높이(화면 높이 - 위아래 여백, !important)도 넘지 않게 한다.
     const cap = parseFloat(win.getComputedStyle(img).maxHeight)
-    const limit = Math.min(columnWidth * ratio, room, cap > 0 ? cap : Infinity)
-    const lines = Math.max(3, Math.floor(limit / line))
-    const height = lines * line
-    const width = Math.min(columnWidth, height / ratio)
+    const heightLimit = Math.min(room, cap > 0 ? cap : Infinity)
+    let width, height, padTop = line, padBottom = line, side = 0
+    if (phoneBleed(layoutMode()) && ratio < 1 && columnGap > 0) {
+      // foliate는 column-width를 정수로 자르므로, 실제 단 너비(본문 상자의 첫 단 조각)에 단 사이 여백을 더해 화면 폭을 구한다.
+      // (본문 상자 전체 너비는 모든 단을 합친 너비라 쓰지 않는다.)
+      const used = doc.body.getClientRects()[0]?.width ?? 0
+      width = (used > columnWidth ? used : columnWidth) + columnGap
+      height = width * ratio
+      if (height > heightLimit) {
+        height = Math.max(3, Math.floor(heightLimit / line)) * line
+        width = height / ratio
+      }
+      const extra = Math.ceil(height / line - 0.001) * line - height
+      padTop += extra / 2
+      padBottom += extra / 2
+      side = Math.max(0, (width - (used > columnWidth ? used : columnWidth)) / 2)
+    } else {
+      const limit = Math.min(columnWidth * ratio, heightLimit)
+      height = Math.max(3, Math.floor(limit / line)) * line
+      width = Math.min(columnWidth, height / ratio)
+    }
     const sig = `${width.toFixed(2)}x${height.toFixed(2)}@${line.toFixed(2)}`
     if (figure.dataset.sig === sig) continue
-    Object.assign(figure.style, { paddingTop: `${line}px`, paddingBottom: `${line}px`, margin: '0', height: 'auto' })
+    Object.assign(figure.style, { paddingTop: `${padTop}px`, paddingBottom: `${padBottom}px`, margin: side ? `0 ${-side}px` : '0', height: 'auto' })
     Object.assign(img.style, { width: `${width}px`, height: `${height}px` })
     figure.dataset.sig = sig
     changed = true
@@ -281,7 +315,7 @@ const applyLayout = () => {
   setAttr(r, 'flow', settings.flow)
   setAttr(r, 'max-column-count', settings.spread === 'single' ? '1' : '2')
   setAttr(r, 'max-inline-size', '700px')
-  setAttr(r, 'gap', LAYOUT[mode].gap)
+  setAttr(r, 'gap', layoutGap(mode))
   setAttr(r, 'animated', settings.flow === 'paginated' ? '' : null)
   // 화면 종류가 바뀌면 문단 나눔 규칙도 바뀌므로 책 CSS를 다시 넣는다(그 안에서 여백도 맞춤).
   if (mode !== lastMode) { lastMode = mode; applyStyles() }
