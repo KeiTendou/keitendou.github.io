@@ -2,7 +2,6 @@
   {
     "id": "fall",
     "title": "추락, 이승, 발자국",
-    "edition": "1·2편 합본",
     "originalTitle": "墜落、此岸、足跡",
     "author": "大豆ビル",
     "parts": [
@@ -21,9 +20,9 @@
       }
     ],
     "file": "books/fall.epub",
-    "sha256": "68240faed84af9270d2a87564ccfb97e4c9c5eef631f420244093ad8bd4a8a2e",
+    "sha256": "3f38f5b0f8469be4bc682da27a71666366856b9f19971d1cd9008430febc92a4",
     "accent": "#6d4c72",
-    "updated": "2026-10-08",
+    "updated": "2026-10-09",
     "share": "fall/",
     "cover": "covers/fall.png",
     "shareDescription": "大豆ビル 님의 「墜落、此岸、足跡」와 후속편 「太陽は天にいまし、我らは地にあり」를 한국어로 옮겨 한 권으로 묶었습니다."
