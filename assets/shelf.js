@@ -25,7 +25,6 @@ const renderBook = book => {
   const started = saved && typeof saved.fraction === 'number' && saved.fraction > 0.005
 
   const cover = el('a', { class: 'cover', href, style: `--book-accent:${book.accent || '#6d4c72'}`, 'aria-label': `${book.title} 읽기` },
-    el('span', { class: 'cover-edition' }, '한국어 번역본'),
     el('span', { class: 'cover-title' }, book.title),
     el('span', { class: 'cover-author', lang: 'ja' }, book.author))
 
