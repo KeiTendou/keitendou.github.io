@@ -5,27 +5,42 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
-<title>번역 서재</title>
+<title>TendouKei</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600&display=swap">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/style.css">
-<script src="assets/shelf.js?v=20261008-s1" defer></script>
+<link rel="stylesheet" href="assets/style.css?v=20261011-s1">
+<script src="assets/shelf.js?v=20261011-s1" defer></script>
 </head>
 <body>
 <main class="shelf-page">
   <header class="shelf-head">
-    <h1>번역 서재</h1>
-    <p>마법소녀 마도카☆마기카 팬픽 한국어 번역 전자책</p>
+    <h1>TendouKei</h1>
+    <p>마법소녀 마도카 마기카</p>
+    <a class="shelf-link" href="https://tendou-kei.tistory.com/">블로그</a>
   </header>
+  <div class="shelf-tools">
+    <label class="chip chip-on"><select id="sort" aria-label="정렬">
+      <option value="added">최신순</option>
+      <option value="read">최근 읽은 순</option>
+      <option value="title">제목순</option>
+      <option value="author">작가순</option>
+    </select></label>
+    <label class="chip"><select id="filter" aria-label="진행률">
+      <option value="all">모든 책</option>
+      <option value="reading">읽는 중</option>
+      <option value="unread">읽지 않음</option>
+      <option value="done">다 읽음</option>
+    </select></label>
+    <button class="view-toggle" id="view" type="button" aria-label="목록으로 보기">
+      <svg class="icon-list" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
+      <svg class="icon-grid" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M4 4h7v7H4zm9 0h7v7h-7zM4 13h7v7H4zm9 0h7v7h-7z"/></svg>
+    </button>
+  </div>
   <ul class="book-list" id="books" aria-live="polite"></ul>
-  <p class="shelf-empty" id="empty" hidden>아직 올라온 책이 없습니다.</p>
-  <footer class="shelf-foot">
-    각 작품의 저작권은 원작자에게 있으며, 이곳의 번역본은 비영리로 공유합니다. 무단 전재와 재배포를 삼가 주세요.<br>
-    읽던 위치는 이 기기의 브라우저에만 저장됩니다.<br>
-    전자책 리더: <a href="https://github.com/johnfactotum/foliate-js" rel="noopener">foliate-js</a> (MIT)
-  </footer>
+  <p class="shelf-empty" id="empty" hidden></p>
+  <footer class="shelf-foot">원작의 저작권은 원작자에게 있습니다.</footer>
 </main>
 </body>
 </html>

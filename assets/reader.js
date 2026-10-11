@@ -569,7 +569,7 @@ const main = async () => {
   }
   book = books.find(b => b.id === bookId)
   if (!book) return showError('찾는 책이 없습니다.')
-  document.title = `${book.title} - 번역 서재`
+  document.title = `${book.title} - TendouKei`
   $('#title').textContent = book.title
 
   view = document.createElement('foliate-view')
